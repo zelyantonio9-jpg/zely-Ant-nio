@@ -33,6 +33,7 @@ import {
   analyzeDisintermediation 
 } from './src/utils/rbacEngine';
 import { ROLE_PERMISSIONS_MATRIX } from './src/utils/rbacMatrix';
+import { INSSOfficialService } from './src/services/inssService';
 
 // In-Memory Database / State for AO MARKET
 let dbUsers: UserProfile[] = [...SEED_PROFILES];
@@ -755,7 +756,110 @@ async function startServer() {
   });
 
   // =================================================================
-  // 8. AUTOMATED SECURITY & RBAC PENETRATION TEST SUITE
+  // 8. OFFICIAL INSS SOVEREIGN INTEGRATION API (Read-Only & Audit Protected)
+  // =================================================================
+
+  // 8.1. Query & Validate Producer/Merchant/Transporter NIF or NISS
+  app.post('/api/inss/validate', async (req, res) => {
+    const { query } = req.body;
+    const user = (req as any).user as UserProfile | null;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({ error: 'Parâmetro de consulta NIF ou NISS obrigatório.' });
+    }
+
+    try {
+      const result = await INSSOfficialService.queryAndValidate(query, user);
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Erro ao comunicar com o Gateway do INSS.' });
+    }
+  });
+
+  // 8.2. Link Validated INSS Status to Business Profile (Authorized Consent)
+  app.post('/api/inss/link-profile', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    if (!user) {
+      return res.status(401).json({ error: 'Autenticação obrigatória para vincular INSS ao perfil.' });
+    }
+
+    const { validationResult, userConsent } = req.body;
+    if (!validationResult || !validationResult.niss) {
+      return res.status(400).json({ error: 'Resultado de validação INSS inválido ou ausente.' });
+    }
+
+    try {
+      const { updatedUser, message } = INSSOfficialService.linkToProfile(user, validationResult, !!userConsent);
+      
+      // Update memory database
+      const idx = dbUsers.findIndex(u => u.id === user.id);
+      if (idx !== -1) {
+        dbUsers[idx] = updatedUser;
+      }
+
+      recordAudit({
+        actorId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        actionRequested: 'POST /api/inss/link-profile',
+        targetResource: 'inss_profile_link',
+        resourceId: validationResult.niss,
+        decision: 'ALLOWED',
+        httpStatus: 200,
+        metadata: {
+          niss: validationResult.niss,
+          complianceStatus: validationResult.complianceStatus,
+          certificateCode: validationResult.certificateCode
+        }
+      });
+
+      return res.json({ success: true, user: updatedUser, message });
+    } catch (err: any) {
+      return res.status(400).json({ error: err.message });
+    }
+  });
+
+  // 8.3. Get INSS Audit Logs (Admin / Support / Audit Read)
+  app.get('/api/inss/audit-logs', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    if (!user || (user.role !== 'admin' && user.role !== 'support')) {
+      return res.status(403).json({ error: 'Acesso restrito ao log oficial de auditoria INSS.' });
+    }
+
+    const logs = INSSOfficialService.getAuditLogs();
+    return res.json(logs);
+  });
+
+  // 8.4. CRITICAL REJECTION: Never Allow Altering INSS Data Directly from AO MARKET
+  app.all(['/api/inss/modify', '/api/inss/update', '/api/inss/delete'], (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    const actorId = user ? user.id : 'anonymous';
+    const actorRole = user ? user.role : 'visitor';
+
+    try {
+      INSSOfficialService.blockDirectINSSModification(actorId, actorRole, req.body);
+    } catch (err: any) {
+      recordAudit({
+        actorId,
+        actorName: user ? user.name : 'Desconhecido',
+        actorRole,
+        actionRequested: `${req.method} ${req.path}`,
+        targetResource: 'inss_sovereign_db',
+        decision: 'DENIED_FORBIDDEN',
+        httpStatus: 403,
+        rejectionReason: 'Tentativa de alteração direta de base de dados soberana do INSS bloqueada.'
+      });
+
+      return res.status(403).json({
+        error: err.message,
+        errorCode: 'FORBIDDEN_READ_ONLY_INSS',
+        sovereigntyNotice: 'O AO MARKET mantém integração estritamente em modo de consulta (Read-Only) com o INSS.'
+      });
+    }
+  });
+
+  // =================================================================
+  // 9. AUTOMATED SECURITY & RBAC PENETRATION TEST SUITE
   // =================================================================
 
   const SECURITY_TEST_CATALOG: SecurityTestCase[] = [
@@ -865,6 +969,21 @@ async function startServer() {
       expectedStatus: 422,
       expectedErrorCode: 'INVALID_STATE_TRANSITION',
       securityPrinciple: 'Máquina de estados estrita: O estado DELIVERED só pode ser emitido por transportador após recolha.'
+    },
+    {
+      id: 'sec_test_08',
+      title: 'Tentativa de Alteração Direta de Dados do INSS via AO MARKET',
+      category: 'INSS_INTEGRIDADE',
+      description: 'Produtor ou utilizador autenticado tenta enviar mutação POST /api/inss/modify para alterar contribuições do INSS.',
+      actorDescription: 'Fazenda Boa Esperança (Produtor A)',
+      actorRole: 'producer',
+      actorId: 'usr_prod_a',
+      targetEndpoint: '/api/inss/modify',
+      httpMethod: 'POST',
+      requestPayload: { niss: 'INSS-44019283', forceStatus: 'REGULAR', simulatedContribution: 0 },
+      expectedStatus: 403,
+      expectedErrorCode: 'FORBIDDEN_READ_ONLY_INSS',
+      securityPrinciple: 'A base do INSS é soberana e estritamente Read-Only. Nenhuma escrita é permitida via AO MARKET.'
     }
   ];
 
@@ -942,6 +1061,14 @@ async function startServer() {
           actualStatus = check.httpStatus;
           actualResponse = { error: check.reason, errorCode: check.errorCode };
           passed = actualStatus === testCase.expectedStatus;
+        } else if (testCase.category === 'INSS_INTEGRIDADE') {
+          try {
+            INSSOfficialService.blockDirectINSSModification(testUser.id, testUser.role, testCase.requestPayload);
+          } catch (err: any) {
+            actualStatus = 403;
+            actualResponse = { error: err.message, errorCode: 'FORBIDDEN_READ_ONLY_INSS' };
+            passed = true;
+          }
         }
       }
 

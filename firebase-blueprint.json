@@ -1,0 +1,123 @@
+{
+  "entities": {
+    "UserProfile": {
+      "collection": "users",
+      "fields": {
+        "id": { "type": "string", "description": "Unique user ID" },
+        "name": { "type": "string", "description": "User or company name" },
+        "email": { "type": "string", "description": "User email address" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "role": { "type": "string", "description": "User role: producer, merchant, buyer, driver, admin, support, auditor" },
+        "province": { "type": "string", "description": "Angolan province" },
+        "municipality": { "type": "string", "description": "Municipality" },
+        "verificationLevel": { "type": "number", "description": "Tier 1 to 5" },
+        "isFormalized": { "type": "boolean", "description": "Whether entity is formally registered" },
+        "inssNumber": { "type": "string", "description": "Official INSS identifier" },
+        "inssVerified": { "type": "boolean", "description": "Validated against sovereign INSS" },
+        "inssComplianceStatus": { "type": "string", "description": "REGULAR, IRREGULAR, ISENTO, NAO_ENCONTRADO" },
+        "inssCertificateCode": { "type": "string", "description": "Certificate verification code" },
+        "inssOfficialName": { "type": "string", "description": "Entity name registered at INSS" },
+        "reputationScore": { "type": "number", "description": "User rating 1-5" },
+        "completedTransactions": { "type": "number", "description": "Total completed orders" },
+        "joinedAt": { "type": "string", "description": "Registration date" }
+      }
+    },
+    "Product": {
+      "collection": "products",
+      "fields": {
+        "id": { "type": "string", "description": "Product SKU/ID" },
+        "title": { "type": "string", "description": "Product display name" },
+        "category": { "type": "string", "description": "Product category (CEREAIS, TUBERCULOS, etc.)" },
+        "variety": { "type": "string", "description": "Crop variety" },
+        "priceAOA": { "type": "number", "description": "Unit price in Kz" },
+        "unit": { "type": "string", "description": "Unit (KG, SACO_50KG, TONELADA, etc.)" },
+        "availableQuantity": { "type": "number", "description": "Current available stock" },
+        "minOrderQuantity": { "type": "number", "description": "Minimum order quantity" },
+        "province": { "type": "string", "description": "Origin province" },
+        "municipality": { "type": "string", "description": "Origin municipality" },
+        "producerId": { "type": "string", "description": "Owner seller/producer ID" },
+        "producerName": { "type": "string", "description": "Seller business name" },
+        "producerVerificationTier": { "type": "number", "description": "Seller tier" },
+        "inssVerified": { "type": "boolean", "description": "Producer has validated INSS" },
+        "images": { "type": "array", "description": "Product photos" },
+        "harvestDate": { "type": "string", "description": "Harvest timestamp" },
+        "createdAt": { "type": "string", "description": "Listing creation timestamp" }
+      }
+    },
+    "Order": {
+      "collection": "orders",
+      "fields": {
+        "id": { "type": "string", "description": "Order number" },
+        "buyerId": { "type": "string", "description": "Buyer user ID" },
+        "buyerName": { "type": "string", "description": "Buyer display name" },
+        "sellerId": { "type": "string", "description": "Seller user ID" },
+        "sellerName": { "type": "string", "description": "Seller display name" },
+        "status": { "type": "string", "description": "Order lifecycle status" },
+        "paymentStatus": { "type": "string", "description": "Escrow/payment status" },
+        "paymentMethod": { "type": "string", "description": "MULTICAIXA_EXPRESS, TRANSFERENCIA_BANCARIA, etc." },
+        "subtotalAOA": { "type": "number", "description": "Products subtotal" },
+        "freightAOA": { "type": "number", "description": "Shipping cost" },
+        "totalAOA": { "type": "number", "description": "Grand total" },
+        "items": { "type": "array", "description": "Order line items" },
+        "createdAt": { "type": "string", "description": "Order timestamp" }
+      }
+    },
+    "FreightLoad": {
+      "collection": "freight_loads",
+      "fields": {
+        "id": { "type": "string", "description": "Freight listing ID" },
+        "orderId": { "type": "string", "description": "Associated order ID" },
+        "originProvince": { "type": "string", "description": "Loading province" },
+        "destinationProvince": { "type": "string", "description": "Delivery province" },
+        "weightKg": { "type": "number", "description": "Total weight in kg" },
+        "freightPriceAOA": { "type": "number", "description": "Offered carrier payment" },
+        "status": { "type": "string", "description": "POSTED, ACCEPTED, IN_TRANSIT, DELIVERED" },
+        "assignedTransporterId": { "type": "string", "description": "Driver/transporter user ID" },
+        "createdAt": { "type": "string", "description": "Posting timestamp" }
+      }
+    },
+    "RFQ": {
+      "collection": "rfqs",
+      "fields": {
+        "id": { "type": "string", "description": "RFQ reference code" },
+        "buyerId": { "type": "string", "description": "Buyer submitting quote request" },
+        "buyerName": { "type": "string", "description": "Buyer name" },
+        "category": { "type": "string", "description": "Product category" },
+        "requiredQuantity": { "type": "number", "description": "Desired volume" },
+        "unit": { "type": "string", "description": "Unit" },
+        "targetPriceAOA": { "type": "number", "description": "Target budget per unit" },
+        "destinationProvince": { "type": "string", "description": "Delivery province" },
+        "status": { "type": "string", "description": "OPEN, QUOTED, ACCEPTED, CLOSED" },
+        "createdAt": { "type": "string", "description": "Request creation timestamp" }
+      }
+    },
+    "SecurityAuditLog": {
+      "collection": "security_audit_logs",
+      "fields": {
+        "id": { "type": "string", "description": "Audit entry ID" },
+        "timestamp": { "type": "string", "description": "Event timestamp" },
+        "actorId": { "type": "string", "description": "User or service triggering event" },
+        "actorName": { "type": "string", "description": "User display name" },
+        "actorRole": { "type": "string", "description": "Role at time of event" },
+        "actionRequested": { "type": "string", "description": "Action or API route" },
+        "targetResource": { "type": "string", "description": "Target entity" },
+        "decision": { "type": "string", "description": "ALLOWED, DENIED_UNAUTHENTICATED, etc." },
+        "httpStatus": { "type": "number", "description": "Result status code" }
+      }
+    },
+    "INSSAuditLog": {
+      "collection": "inss_audit_logs",
+      "fields": {
+        "id": { "type": "string", "description": "INSS sovereign log ID" },
+        "timestamp": { "type": "string", "description": "Query timestamp" },
+        "nif": { "type": "string", "description": "Queried NIF" },
+        "niss": { "type": "string", "description": "Queried NISS" },
+        "queriedByUserId": { "type": "string", "description": "Actor user ID" },
+        "queriedByUserName": { "type": "string", "description": "Actor name" },
+        "action": { "type": "string", "description": "CONSULTA_API, VINCULACAO_PERFIL, etc." },
+        "decision": { "type": "string", "description": "SUCCESS, DENIED, BLOCKED_READ_ONLY" },
+        "notes": { "type": "string", "description": "Auditor notes" }
+      }
+    }
+  }
+}

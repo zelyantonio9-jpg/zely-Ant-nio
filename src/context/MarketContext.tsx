@@ -17,11 +17,15 @@ import {
   VerificationLevel,
   AccountRegistrationStatus,
   CompanyTeamMember,
-  RegistrationAuditLog
+  RegistrationAuditLog,
+  INSSValidationResult,
+  INSSAuditLog
 } from '../types';
 import { SEED_PROFILES, SEED_PRODUCTS, SEED_ORDERS, SEED_FREIGHT_LOADS, SEED_RFQS, SEED_DISPUTES, SEED_DRIVERS } from '../data/seedData';
 import { calculateFreightEstimate } from '../data/angolaGeoData';
 import { api } from '../services/apiClient';
+import { INSSOfficialService } from '../services/inssService';
+import { FirestoreSyncService } from '../services/firestoreService';
 import { 
   hasPermission, 
   checkProductOwnership, 
@@ -90,6 +94,11 @@ interface MarketContextType {
   formatKz: (val: number) => string;
   markNotificationAsRead: (notifId: string) => void;
   addNotification: (title: string, message: string, type: EcosystemNotification['type']) => void;
+  validateInss: (query: string) => Promise<INSSValidationResult>;
+  linkInssToProfile: (validationResult: INSSValidationResult, userConsent: boolean) => Promise<{ success: boolean; message: string }>;
+  inssAuditLogs: INSSAuditLog[];
+  refreshInssAuditLogs: () => Promise<void>;
+  attemptInssModification: (payload: any) => Promise<any>;
   resetToOfficialData: () => void;
   clearAllTransactions: () => void;
 }
@@ -243,6 +252,43 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       api.setAuthToken(currentUser.id);
     }
   }, [currentUser]);
+
+  // Initialize Firestore database with seed data if cloud database is empty
+  useEffect(() => {
+    FirestoreSyncService.seedInitialDataIfEmpty(
+      SEED_PROFILES,
+      SEED_PRODUCTS,
+      SEED_ORDERS,
+      SEED_FREIGHT_LOADS,
+      SEED_RFQS,
+      SEED_DISPUTES
+    );
+
+    // Subscribe to cloud Firestore updates for real-time synchronization
+    const unsubProducts = FirestoreSyncService.subscribeToProducts((cloudProducts) => {
+      if (cloudProducts && cloudProducts.length > 0) {
+        setProducts(cloudProducts);
+      }
+    });
+
+    const unsubOrders = FirestoreSyncService.subscribeToOrders((cloudOrders) => {
+      if (cloudOrders && cloudOrders.length > 0) {
+        setOrders(cloudOrders);
+      }
+    });
+
+    const unsubUsers = FirestoreSyncService.subscribeToUsers((cloudUsers) => {
+      if (cloudUsers && cloudUsers.length > 0) {
+        setRegisteredUsers(cloudUsers);
+      }
+    });
+
+    return () => {
+      unsubProducts();
+      unsubOrders();
+      unsubUsers();
+    };
+  }, []);
 
   // Sync to local storage
   useEffect(() => {
@@ -1091,6 +1137,76 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // =================================================================
+  // INSS OFFICIAL SOVEREIGN INTEGRATION & AUDIT
+  // =================================================================
+  const [inssAuditLogs, setInssAuditLogs] = useState<INSSAuditLog[]>(() => INSSOfficialService.getAuditLogs());
+
+  const refreshInssAuditLogs = async () => {
+    try {
+      const logs = await api.getINSSAuditLogs();
+      setInssAuditLogs(logs);
+    } catch {
+      setInssAuditLogs(INSSOfficialService.getAuditLogs());
+    }
+  };
+
+  const validateInss = async (query: string): Promise<INSSValidationResult> => {
+    try {
+      const result = await api.validateINSS(query);
+      refreshInssAuditLogs();
+      return result;
+    } catch (err: any) {
+      // Fallback local service if API call fails
+      const fallback = await INSSOfficialService.queryAndValidate(query, currentUser);
+      setInssAuditLogs(INSSOfficialService.getAuditLogs());
+      return fallback;
+    }
+  };
+
+  const linkInssToProfile = async (
+    validationResult: INSSValidationResult, 
+    userConsent: boolean
+  ): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await api.linkINSSProfile(validationResult, userConsent);
+      if (response.success && response.user) {
+        setCurrentUser(response.user);
+        setRegisteredUsers(prev => prev.map(u => u.id === response.user.id ? response.user : u));
+        localStorage.setItem('ao_market_current_user', JSON.stringify(response.user));
+        addNotification(
+          'INSS Verificado com Sucesso', 
+          `O seu perfil foi associado ao NISS ${validationResult.niss} com Selo de Entidade Verificada.`, 
+          'FORMALIZATION'
+        );
+      }
+      refreshInssAuditLogs();
+      return { success: true, message: response.message };
+    } catch (err: any) {
+      // Local fallback execution
+      const localRes = INSSOfficialService.linkToProfile(currentUser, validationResult, userConsent);
+      setCurrentUser(localRes.updatedUser);
+      setRegisteredUsers(prev => prev.map(u => u.id === localRes.updatedUser.id ? localRes.updatedUser : u));
+      localStorage.setItem('ao_market_current_user', JSON.stringify(localRes.updatedUser));
+      setInssAuditLogs(INSSOfficialService.getAuditLogs());
+      addNotification(
+        'INSS Verificado com Sucesso', 
+        `O seu perfil foi associado ao NISS ${validationResult.niss} com Selo de Entidade Verificada.`, 
+        'FORMALIZATION'
+      );
+      return { success: true, message: localRes.message };
+    }
+  };
+
+  const attemptInssModification = async (payload: any): Promise<any> => {
+    try {
+      return await api.attemptINSSModification(payload);
+    } catch (err: any) {
+      refreshInssAuditLogs();
+      throw err;
+    }
+  };
+
   return (
     <MarketContext.Provider value={{
       currentUser,
@@ -1141,6 +1257,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       formatKz,
       markNotificationAsRead,
       addNotification,
+      validateInss,
+      linkInssToProfile,
+      inssAuditLogs,
+      refreshInssAuditLogs,
+      attemptInssModification,
       resetToOfficialData,
       clearAllTransactions
     }}>

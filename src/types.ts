@@ -66,7 +66,13 @@ export type PermissionAction =
   // Disputes
   | 'disputes:create'
   | 'disputes:read'
-  | 'disputes:resolve';
+  | 'disputes:resolve'
+  // Reviews & Evaluation
+  | 'orders:evaluate'
+  // INSS Integration
+  | 'inss:validate'
+  | 'inss:link'
+  | 'inss:audit_read';
 
 export type EntityType = 'PESSOA_SINGULAR' | 'EMPRESA' | 'COOPERATIVA' | 'ASSOCIACAO';
 
@@ -166,15 +172,20 @@ export interface ProducerDetails {
 }
 
 export interface MerchantDetails {
-  merchantTypes: ('RETALHISTA' | 'GROSSISTA' | 'DISTRIBUIDOR' | 'SUPERMERCADO' | 'HOTEL_RESTAURANTE' | 'B2B_EMPRESA')[];
-  hasPhysicalStore: boolean;
+  businessType?: 'GROSSISTA' | 'DISTRIBUIDOR' | 'RETALHISTA' | 'SUPERMERCADO' | 'COOPERATIVA' | string;
+  merchantTypes?: ('RETALHISTA' | 'GROSSISTA' | 'DISTRIBUIDOR' | 'SUPERMERCADO' | 'HOTEL_RESTAURANTE' | 'B2B_EMPRESA')[];
+  hasPhysicalStore?: boolean;
   storeAddress?: string;
-  hasWarehouse: boolean;
+  hasWarehouse?: boolean;
   warehouseLocation?: string;
   warehouseCapacityM3?: number;
-  hasColdChainStorage: boolean;
+  hasColdChainStorage?: boolean;
   commercialRegistryNumber?: string;
   b2bCreditTermsAccepted?: boolean;
+  annualVolumeKg?: number;
+  targetMarkets?: string[];
+  storageCapacityTons?: number;
+  offersColdStorage?: boolean;
 }
 
 export interface TransporterVehicle {
@@ -209,12 +220,66 @@ export interface BuyerDetails {
   defaultDeliveryAddress?: string;
 }
 
+export type INSSComplianceStatus = 
+  | 'REGULAR' 
+  | 'IRREGULAR' 
+  | 'ISENTO' 
+  | 'EM_ANALISE' 
+  | 'NAO_ENCONTRADO';
+
+export type INSSRegimeType = 
+  | 'TRABALHADOR_CONTA_PROPRIA' 
+  | 'PREI_SIMPLIFICADO' 
+  | 'CONTA_OUTREM' 
+  | 'MICROEMPRESA' 
+  | 'REGIME_GERAL';
+
+export interface INSSValidationResult {
+  niss: string;
+  nif: string;
+  officialEntityName: string;
+  entityType: string;
+  regime: INSSRegimeType;
+  complianceStatus: INSSComplianceStatus;
+  statusMessage: string;
+  lastContributionPeriod?: string;
+  totalContributorsCount?: number;
+  certificateIssueDate: string;
+  certificateExpiryDate: string;
+  certificateCode: string;
+  verificationMethod: 'API_OFICIAL_INSS_GOV_AO';
+  isVerified: boolean;
+  verifiedAt: string;
+  qrVerificationUrl?: string;
+}
+
+export interface INSSAuditLog {
+  id: string;
+  timestamp: string;
+  nif: string;
+  niss?: string;
+  queriedByUserId: string;
+  queriedByUserName: string;
+  queriedByRole: string;
+  action: 'CONSULTA_API' | 'VINCULACAO_PERFIL' | 'RENOVACAO_CERTIFICADO' | 'TENTATIVA_ALTERACAO_BLOQUEADA';
+  decision: 'SUCCESS' | 'DENIED' | 'BLOCKED_READ_ONLY';
+  ipAddress: string;
+  userAgent?: string;
+  notes: string;
+  responseStatus: number;
+}
+
 export interface SocialProtectionInfo {
   status: 'INSCRITO' | 'ADERIR_INTERESSE' | 'INFORMATIVO' | 'NAO_ADERIR';
   inssNumber?: string;
-  regimeType?: 'TRABALHADOR_CONTA_PROPRIA' | 'PREI_SIMPLIFICADO' | 'CONTA_OUTREM' | 'MICROEMPRESA';
+  regimeType?: INSSRegimeType;
   verificationStatus: 'NAO_VALIDADO' | 'DECLARADO' | 'VALIDADO_OFICIAL';
+  complianceStatus?: INSSComplianceStatus;
+  officialName?: string;
+  certificateCode?: string;
+  certificateExpiryDate?: string;
   declaredAt?: string;
+  verifiedAt?: string;
 }
 
 export interface TrustVerificationBadge {
@@ -253,6 +318,13 @@ export interface UserProfile {
   formalizationStatus?: FormalizationOption;
   inssNumber?: string;
   inssEnrollmentStatus?: InssOption;
+  inssVerified?: boolean;
+  inssComplianceStatus?: INSSComplianceStatus;
+  inssVerifiedAt?: string;
+  inssCertificateCode?: string;
+  inssOfficialName?: string;
+  inssRegime?: INSSRegimeType;
+  inssLastSyncAt?: string;
   nif?: string;
   biNumber?: string;
   
@@ -557,12 +629,13 @@ export interface SecurityAuditEntry {
   httpStatus: 200 | 201 | 401 | 403 | 422;
   rejectionReason?: string;
   ipAddress?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface SecurityTestCase {
   id: string;
   title: string;
-  category: 'AUTENTICACAO' | 'OWNERSHIP' | 'RBAC_PERMISSOES' | 'MULTI_TENANT' | 'MAQUINA_ESTADOS' | 'SUPORTE_LIMITS' | 'DESINTERMEDIACAO';
+  category: 'AUTENTICACAO' | 'OWNERSHIP' | 'RBAC_PERMISSOES' | 'MULTI_TENANT' | 'MAQUINA_ESTADOS' | 'SUPORTE_LIMITS' | 'DESINTERMEDIACAO' | 'INSS_INTEGRIDADE';
   description: string;
   actorDescription: string;
   actorRole: UserRole | 'visitor';

@@ -8,7 +8,9 @@ import {
   SecurityAuditEntry, 
   SecurityTestCase, 
   SecurityTestResult,
-  OrderStatus 
+  OrderStatus,
+  INSSValidationResult,
+  INSSAuditLog 
 } from '../types';
 
 class ApiClient {
@@ -181,6 +183,32 @@ class ApiClient {
   // Security Audit & Penetration Test Suite
   async getAuditLogs(): Promise<SecurityAuditEntry[]> {
     return this.request('/api/admin/audit-logs');
+  }
+
+  // Official INSS Sovereign Integration
+  async validateINSS(query: string): Promise<INSSValidationResult> {
+    return this.request('/api/inss/validate', {
+      method: 'POST',
+      body: JSON.stringify({ query })
+    });
+  }
+
+  async linkINSSProfile(validationResult: INSSValidationResult, userConsent: boolean): Promise<{ success: boolean; user: UserProfile; message: string }> {
+    return this.request('/api/inss/link-profile', {
+      method: 'POST',
+      body: JSON.stringify({ validationResult, userConsent })
+    });
+  }
+
+  async getINSSAuditLogs(): Promise<INSSAuditLog[]> {
+    return this.request('/api/inss/audit-logs');
+  }
+
+  async attemptINSSModification(payload: any): Promise<any> {
+    return this.request('/api/inss/modify', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
   }
 
   async getSecurityTestCatalog(): Promise<SecurityTestCase[]> {

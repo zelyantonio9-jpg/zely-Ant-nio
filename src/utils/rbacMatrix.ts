@@ -23,6 +23,8 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'orders:create',
     'orders:read',
     'orders:cancel',
+    'orders:evaluate',
+    'payments:read',
     'transport:read',
     'documents:read',
     'chats:read',
@@ -44,7 +46,9 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'documents:upload',
     'documents:read',
     'chats:read',
-    'chats:send'
+    'chats:send',
+    'inss:validate',
+    'inss:link'
   ],
 
   merchant: [
@@ -59,13 +63,16 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'orders:prepare',
     'orders:cancel',
     'orders:status_update',
+    'orders:evaluate',
     'transport:read',
     'documents:upload',
     'documents:read',
     'chats:read',
     'chats:send',
     'disputes:create',
-    'disputes:read'
+    'disputes:read',
+    'inss:validate',
+    'inss:link'
   ],
 
   driver: [
@@ -75,9 +82,12 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'transport:status_update',
     'transport:confirm_pickup',
     'transport:confirm_delivery',
+    'documents:upload',
     'documents:read',
     'chats:read',
-    'chats:send'
+    'chats:send',
+    'inss:validate',
+    'inss:link'
   ],
 
   logistics_company: [
@@ -93,7 +103,9 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'documents:upload',
     'documents:read',
     'chats:read',
-    'chats:send'
+    'chats:send',
+    'inss:validate',
+    'inss:link'
   ],
 
   company_admin: [
@@ -112,6 +124,7 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'orders:prepare',
     'orders:cancel',
     'orders:status_update',
+    'orders:evaluate',
     'transport:read',
     'transport:accept',
     'transport:status_update',
@@ -121,7 +134,9 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'chats:read',
     'chats:send',
     'disputes:create',
-    'disputes:read'
+    'disputes:read',
+    'inss:validate',
+    'inss:link'
   ],
 
   company_user: [
@@ -148,7 +163,8 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'chats:read',
     'chats:monitor_flagged',
     'disputes:read',
-    'disputes:resolve'
+    'disputes:resolve',
+    'inss:audit_read'
   ],
 
   admin: [
@@ -163,6 +179,7 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'orders:prepare',
     'orders:cancel',
     'orders:status_update',
+    'orders:evaluate',
     'transport:read',
     'transport:accept',
     'transport:reject',
@@ -197,9 +214,114 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'chats:monitor_flagged',
     'disputes:create',
     'disputes:read',
-    'disputes:resolve'
+    'disputes:resolve',
+    'inss:validate',
+    'inss:link',
+    'inss:audit_read'
   ]
 };
+
+/**
+ * Explicit Persona Profiles Definition according to Sovereign Market Requirements:
+ * - Produtor: cadastra produtos, gere stock, define preços, recebe pedidos e vende.
+ * - Comerciante: compra para revender, publica produtos/serviços, gere vendas, stock e pedidos.
+ * - Comprador: pesquisa, compara, compra, paga, acompanha entregas e avalia.
+ * - Transportadora: recebe, aceita, recolhe, transporta, atualiza e confirma entregas.
+ * - Administrador: gere utilizadores, documentos, produtos, pagamentos, disputas, denúncias e configurações.
+ */
+export const OFFICIAL_PERSONA_PROFILES = [
+  {
+    role: 'producer' as UserRole,
+    title: 'Produtor Rural',
+    description: 'Cadastra produtos e lotes agrícolas, gere stock e inventário, define preços unitários e por atacado, recebe pedidos de compra e vende a sua produção com emissão de guia de recolha com PIN OTP.',
+    coreActions: [
+      'Cadastrar produtos e lotes de colheita',
+      'Gerir stock e disponibilidade em fazenda',
+      'Definir preços e quantidades mínimas',
+      'Receber e aceitar pedidos de compra',
+      'Vender e libertar carga com PIN de recolha',
+      'Validar e associar NISS/NIF oficial do INSS'
+    ],
+    prohibitedActions: [
+      'Comprar para revender como comerciante',
+      'Aceitar ordens de frete rodoviário',
+      'Moderar utilizadores ou alterar dados alheios'
+    ]
+  },
+  {
+    role: 'merchant' as UserRole,
+    title: 'Comerciante & Grossista',
+    description: 'Compra produtos para revender no atacado/retalho, publica produtos e serviços de distribuição/armazém, gere as suas vendas, stock em armazém e gere pedidos recebidos de clientes.',
+    coreActions: [
+      'Comprar produtos e lotes para revenda no atacado',
+      'Publicar produtos e serviços de revenda/distribuição',
+      'Gerir stock e inventário de armazém',
+      'Gerir vendas e pedidos de clientes',
+      'Emitir cotações em grande escala (RFQ)',
+      'Validar conformidade INSS da empresa'
+    ],
+    prohibitedActions: [
+      'Operar transportes rodoviários como transportadora',
+      'Aceder a dados administrativos de outros utilizadores'
+    ]
+  },
+  {
+    role: 'buyer' as UserRole,
+    title: 'Comprador (Consumidor & Empresa)',
+    description: 'Pesquisa o catálogo nacional, compara preços entre províncias, compra produtos no retalho ou atacado, paga via Multicaixa Express / Custódia AO Protect, acompanha o transporte e entregas em tempo real e avalia vendedores.',
+    coreActions: [
+      'Pesquisar e comparar produtos no Catálogo Nacional',
+      'Comprar produtos e fechar encomendas',
+      'Pagar com segurança e custódia protegida',
+      'Acompanhar entregas e rastreio rodoviário',
+      'Validar entrega final com PIN OTP de descarga',
+      'Avaliar produtores, comerciantes e transportadores'
+    ],
+    prohibitedActions: [
+      'Cadastrar produtos para venda',
+      'Gerir inventários de vendedores',
+      'Aceitar serviços de frete'
+    ]
+  },
+  {
+    role: 'driver' as UserRole,
+    title: 'Transportadora / Motorista',
+    description: 'Recebe ofertas de frete na Bolsa de Cargas, aceita rotas rodoviárias, recolhe a mercadoria na origem com validação de PIN do produtor, transporta pelos corredores rodoviários, atualiza o estado em trânsito e confirma entregas com PIN do comprador.',
+    coreActions: [
+      'Receber ofertas de frete na Bolsa de Cargas',
+      'Aceitar ordens de transporte interprovincial',
+      'Recolher mercadoria com validação de PIN de recolha',
+      'Transportar nos corredores logísticos nacionais',
+      'Atualizar estado da viagem (Em Trânsito, Atraso, etc.)',
+      'Confirmar entrega mediante PIN de descarga do comprador',
+      'Validar conformidade contributiva INSS do transportador'
+    ],
+    prohibitedActions: [
+      'Publicar produtos para venda',
+      'Comprar mercadorias para revenda',
+      'Alterar preços ou cancelar pedidos alheios'
+    ]
+  },
+  {
+    role: 'admin' as UserRole,
+    title: 'Administrador (Supervisão Nacional)',
+    description: 'Gere utilizadores (aprovação, suspensão, auditoria), documentos fiscais e legais, moderação de produtos, pagamentos e custódia bancária, disputas e mediações, denúncias de segurança e configurações do sistema.',
+    coreActions: [
+      'Gerir utilizadores e perfis (aprovar, suspender, auditar)',
+      'Validar e aprovar documentos fiscais e empresariais',
+      'Moderar produtos e catálogo nacional',
+      'Supervisionar pagamentos e custódia financeira',
+      'Gerir disputas e mediações de litígios (AO Protect)',
+      'Monitorizar denúncias e alertas de desintermediação',
+      'Consultar logs de auditoria INSS e de segurança',
+      'Gerir parâmetros e configurações da plataforma'
+    ],
+    prohibitedActions: [
+      'Alterar dados do INSS diretamente (Read-Only Governamental)',
+      'Executar ações sem registo no log de auditoria imutável'
+    ]
+  }
+];
 
 /**
  * Company Team Sub-Role Permissions

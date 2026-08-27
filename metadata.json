@@ -1,0 +1,6 @@
+{
+  "name": "AO MARKET",
+  "description": "Ecossistema económico digital angolano conectando produtores, comerciantes, logística, pagamentos e formalização com a Segurança Social.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

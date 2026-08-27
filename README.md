@@ -1,11 +1,27 @@
-<div align="center">
+# AO MARKET • Ecossistema Digital Angolano
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Plataforma de comércio de produção nacional, cotações grossistas B2B, bolsa de frete rodoviário e formalização na Segurança Social (INSS).
 
-  <h1>Built with AI Studio</h2>
+## Principais Funcionalidades
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+- **Mercado Nacional:** Compra e venda de produtos das 18 províncias de Angola.
+- **Bolsa de Logística:** Cargas interprovinciais (EN100, EN120, EN230 e Corredor do Lobito).
+- **AO Protect (Escrow):** Retenção e libertação segura de pagamentos.
+- **Validação PIN OTP:** Desbloqueio e liquidação financeira após validação de entrega no destino.
+- **Integração INSS:** Dedução e registo automático de contribuições para a segurança social de produtores e camionistas.
+- **Cotações RFQ B2B:** Negociação em grande escala para empresas e grossistas.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Execução Local
 
-</div>
+```bash
+# Instalação de dependências
+npm install
+
+# Iniciar servidor de desenvolvimento
+npm run dev
+
+# Compilar para produção
+npm run build
+```
+
+Consulte o ficheiro [DOCUMENTATION.md](./DOCUMENTATION.md) para a documentação técnica e arquitetural detalhada.

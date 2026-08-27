@@ -368,10 +368,15 @@ export interface UserProfile {
 
 export type ProductCategory = 
   | 'agricultura_frescos'
+  | 'alimentos_frescos'
   | 'graos_cereais'
   | 'pecuaria_carnes'
   | 'pesca_mariscos'
   | 'transformacao_nacional'
+  | 'moda_beleza'
+  | 'eletronicos'
+  | 'lar_decoracao'
+  | 'artesanato_ao'
   | 'materiais_construcao'
   | 'bebidas_embalados'
   | 'artesanato_utilidades';

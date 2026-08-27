@@ -3,7 +3,7 @@ import {
   doc, 
   getDocs, 
   setDoc, 
-  getDoc, 
+  deleteDoc,
   onSnapshot, 
   query, 
   writeBatch,
@@ -23,51 +23,46 @@ import {
 
 export class FirestoreSyncService {
   /**
-   * Initialize collections with seed data if they are empty in Firestore
+   * Check if users exist in Firestore
    */
-  public static async seedInitialDataIfEmpty(
-    seedUsers: UserProfile[],
-    seedProducts: Product[],
-    seedOrders: Order[],
-    seedFreight: FreightLoad[],
-    seedRfqs: B2BQuotationRequest[],
-    seedDisputes: DisputeRecord[]
-  ): Promise<void> {
+  public static async hasExistingData(): Promise<boolean> {
     try {
       const usersSnap = await getDocs(collection(db, 'users'));
-      if (usersSnap.empty) {
-        console.log('[Firestore] Seeding initial database records...');
+      return !usersSnap.empty;
+    } catch (e) {
+      console.warn('[Firestore] Checking data error:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Completely clear test data in Firestore cloud database
+   */
+  public static async clearAllCloudData(): Promise<void> {
+    try {
+      const collectionsToClear = [
+        'users',
+        'orders',
+        'freight_loads',
+        'rfqs',
+        'disputes',
+        'security_audit_logs',
+        'inss_audit_logs'
+      ];
+
+      for (const colName of collectionsToClear) {
+        const snap = await getDocs(collection(db, colName));
         const batch = writeBatch(db);
-
-        seedUsers.forEach(u => {
-          batch.set(doc(db, 'users', u.id), u);
+        snap.forEach((d) => {
+          batch.delete(doc(db, colName, d.id));
         });
-
-        seedProducts.forEach(p => {
-          batch.set(doc(db, 'products', p.id), p);
-        });
-
-        seedOrders.forEach(o => {
-          batch.set(doc(db, 'orders', o.id), o);
-        });
-
-        seedFreight.forEach(f => {
-          batch.set(doc(db, 'freight_loads', f.id), f);
-        });
-
-        seedRfqs.forEach(r => {
-          batch.set(doc(db, 'rfqs', r.id), r);
-        });
-
-        seedDisputes.forEach(d => {
-          batch.set(doc(db, 'disputes', d.id), d);
-        });
-
-        await batch.commit();
-        console.log('[Firestore] Initial database records seeded successfully.');
+        if (!snap.empty) {
+          await batch.commit();
+        }
       }
+      console.log('[Firestore] All cloud test data wiped successfully.');
     } catch (err) {
-      console.warn('[Firestore] Notice during initial seed verification:', err);
+      console.warn('[Firestore] Error clearing cloud data:', err);
     }
   }
 
@@ -76,11 +71,9 @@ export class FirestoreSyncService {
   public static subscribeToProducts(onUpdate: (products: Product[]) => void): Unsubscribe {
     const q = query(collection(db, 'products'));
     return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const items: Product[] = [];
-        snapshot.forEach((doc) => items.push(doc.data() as Product));
-        onUpdate(items);
-      }
+      const items: Product[] = [];
+      snapshot.forEach((d) => items.push(d.data() as Product));
+      onUpdate(items);
     }, (error) => {
       console.warn('[Firestore] Products subscription notice:', error);
     });
@@ -89,11 +82,9 @@ export class FirestoreSyncService {
   public static subscribeToOrders(onUpdate: (orders: Order[]) => void): Unsubscribe {
     const q = query(collection(db, 'orders'));
     return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const items: Order[] = [];
-        snapshot.forEach((doc) => items.push(doc.data() as Order));
-        onUpdate(items);
-      }
+      const items: Order[] = [];
+      snapshot.forEach((d) => items.push(d.data() as Order));
+      onUpdate(items);
     }, (error) => {
       console.warn('[Firestore] Orders subscription notice:', error);
     });
@@ -102,23 +93,62 @@ export class FirestoreSyncService {
   public static subscribeToUsers(onUpdate: (users: UserProfile[]) => void): Unsubscribe {
     const q = query(collection(db, 'users'));
     return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const items: UserProfile[] = [];
-        snapshot.forEach((doc) => items.push(doc.data() as UserProfile));
-        onUpdate(items);
-      }
+      const items: UserProfile[] = [];
+      snapshot.forEach((d) => items.push(d.data() as UserProfile));
+      onUpdate(items);
     }, (error) => {
       console.warn('[Firestore] Users subscription notice:', error);
     });
   }
 
-  // --- Persistence Methods ---
+  public static subscribeToFreightLoads(onUpdate: (loads: FreightLoad[]) => void): Unsubscribe {
+    const q = query(collection(db, 'freight_loads'));
+    return onSnapshot(q, (snapshot) => {
+      const items: FreightLoad[] = [];
+      snapshot.forEach((d) => items.push(d.data() as FreightLoad));
+      onUpdate(items);
+    }, (error) => {
+      console.warn('[Firestore] Freight loads subscription notice:', error);
+    });
+  }
+
+  public static subscribeToRfqs(onUpdate: (rfqs: B2BQuotationRequest[]) => void): Unsubscribe {
+    const q = query(collection(db, 'rfqs'));
+    return onSnapshot(q, (snapshot) => {
+      const items: B2BQuotationRequest[] = [];
+      snapshot.forEach((d) => items.push(d.data() as B2BQuotationRequest));
+      onUpdate(items);
+    }, (error) => {
+      console.warn('[Firestore] RFQ subscription notice:', error);
+    });
+  }
+
+  public static subscribeToDisputes(onUpdate: (disputes: DisputeRecord[]) => void): Unsubscribe {
+    const q = query(collection(db, 'disputes'));
+    return onSnapshot(q, (snapshot) => {
+      const items: DisputeRecord[] = [];
+      snapshot.forEach((d) => items.push(d.data() as DisputeRecord));
+      onUpdate(items);
+    }, (error) => {
+      console.warn('[Firestore] Disputes subscription notice:', error);
+    });
+  }
+
+  // --- Real-time Persistence Methods directly to Firebase Firestore ---
 
   public static async saveProduct(product: Product): Promise<void> {
     try {
       await setDoc(doc(db, 'products', product.id), product);
     } catch (e) {
       console.warn('[Firestore] saveProduct notice:', e);
+    }
+  }
+
+  public static async deleteProduct(productId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'products', productId));
+    } catch (e) {
+      console.warn('[Firestore] deleteProduct notice:', e);
     }
   }
 
@@ -135,6 +165,14 @@ export class FirestoreSyncService {
       await setDoc(doc(db, 'users', user.id), user);
     } catch (e) {
       console.warn('[Firestore] saveUser notice:', e);
+    }
+  }
+
+  public static async deleteUser(userId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+    } catch (e) {
+      console.warn('[Firestore] deleteUser notice:', e);
     }
   }
 

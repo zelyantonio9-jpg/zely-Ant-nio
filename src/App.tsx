@@ -11,6 +11,7 @@ import { SocialProtectionPortal } from './components/SocialProtectionPortal';
 import { DisputesPortal } from './components/DisputesPortal';
 import { AdminPortal } from './components/AdminPortal';
 import { AuthModal } from './components/AuthModal';
+import { AdminSecretModal } from './components/AdminSecretModal';
 import { CartAndCheckoutModal } from './components/CartAndCheckoutModal';
 import { OrderTrackingModal } from './components/OrderTrackingModal';
 import { AIAssistantModal } from './components/AIAssistantModal';
@@ -22,7 +23,7 @@ import { RestrictedAccessView } from './components/RestrictedAccessView';
 import { isTabAllowedForRole, getDefaultTabForRole } from './utils/rolePermissions';
 import { Logo } from './components/Logo';
 import { Order } from './types';
-import { Truck, ShieldCheck, KeyRound, Sparkles, MapPin, CheckCircle2, Award, Building2, ShieldAlert } from 'lucide-react';
+import { Truck, ShieldCheck, KeyRound, Sparkles, MapPin, CheckCircle2, Award, Building2, ShieldAlert, MessageCircle } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { orders, currentUser, isAuthenticated, formatKz } = useMarket();
@@ -34,6 +35,7 @@ const MainAppContent: React.FC = () => {
   // Modals
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [isAdminSecretModalOpen, setIsAdminSecretModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isArchitectureOpen, setIsArchitectureOpen] = useState(false);
@@ -70,6 +72,7 @@ const MainAppContent: React.FC = () => {
         onOpenDocCenter={() => setIsDocCenterOpen(true)}
         onOpenTeamManagement={() => setIsTeamManagementOpen(true)}
         onOpenSecurityAuditor={currentUser.role === 'admin' ? () => setIsSecurityAuditorOpen(true) : undefined}
+        onOpenAdminSecretModal={() => setIsAdminSecretModalOpen(true)}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         activeTab={activeTab}
@@ -175,15 +178,7 @@ const MainAppContent: React.FC = () => {
         )}
 
         {activeTab === 'social_protection' && (
-          isTabAllowedForRole('social_protection', currentUser.role, isAuthenticated) ? (
-            <SocialProtectionPortal />
-          ) : (
-            <RestrictedAccessView
-              targetTab="social_protection"
-              onNavigate={(tab) => setActiveTab(tab)}
-              onOpenAuth={handleOpenAuth}
-            />
-          )
+          <SocialProtectionPortal />
         )}
 
         {activeTab === 'disputes' && (
@@ -217,7 +212,6 @@ const MainAppContent: React.FC = () => {
         onClose={() => setIsAuthModalOpen(false)}
         initialMode={authModalMode}
         onSuccess={() => {
-          // Send user to their dedicated portal
           setTimeout(() => {
             const saved = localStorage.getItem('ao_market_current_user');
             if (saved) {
@@ -227,6 +221,15 @@ const MainAppContent: React.FC = () => {
               }
             }
           }, 50);
+        }}
+      />
+
+      {/* Admin Secret Gateway Modal (5 clicks on logo) */}
+      <AdminSecretModal
+        isOpen={isAdminSecretModalOpen}
+        onClose={() => setIsAdminSecretModalOpen(false)}
+        onSuccess={() => {
+          setActiveTab('admin');
         }}
       />
 
@@ -283,6 +286,19 @@ const MainAppContent: React.FC = () => {
         />
       )}
 
+      {/* Floating Orange Chat / AI Assistant Support Action Button */}
+      <button
+        id="btn-floating-support-chat"
+        onClick={() => setIsAssistantOpen(true)}
+        className="fixed bottom-6 right-6 z-40 bg-[#FF6B00] hover:bg-[#E05E00] active:scale-95 text-white p-3.5 sm:p-4 rounded-full shadow-2xl shadow-orange-600/40 hover:scale-108 transition-all duration-200 cursor-pointer flex items-center justify-center group"
+        title="Assistente Virtual & Suporte AO MARKET"
+      >
+        <MessageCircle className="w-6 h-6 text-white" />
+        <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-xs group-hover:ml-2 transition-all duration-300 ease-in-out font-bold text-xs">
+          Suporte Online
+        </span>
+      </button>
+
       {/* Comprehensive Sovereign Angolan Ecosystem Footer */}
       <footer className="bg-[#0b101c] border-t border-[#1e293b] text-[#94a3b8] text-xs py-10 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -291,7 +307,8 @@ const MainAppContent: React.FC = () => {
             <div className="space-y-3">
               <Logo 
                 variant="footer" 
-                onClick={() => setActiveTab('home')} 
+                onClick={() => setActiveTab('home')}
+                onSecretAdminTrigger={() => setIsAdminSecretModalOpen(true)} 
               />
               <p className="text-[#94a3b8] text-xs leading-relaxed pt-1">
                 Plataforma oficial que estrutura o escoamento agro-industrial da República de Angola: conectando cooperativas, transportadores rodoviários certificados e centrais de distribuição com custódia regulada e proteção social.
@@ -311,69 +328,78 @@ const MainAppContent: React.FC = () => {
 
             {/* Column 2 */}
             <div className="space-y-2.5">
-              <h4 className="font-bold text-[#f8fafc] uppercase tracking-wider text-[11px]">Pilares do Sistema</h4>
-              <ul className="space-y-2 text-[#94a3b8] text-xs">
-                <li><button onClick={() => setActiveTab('home')} className="hover:text-amber-400 transition text-left cursor-pointer">Página Inicial Soberana</button></li>
-                <li><button onClick={() => setActiveTab('marketplace')} className="hover:text-amber-400 transition text-left cursor-pointer">Catálogo Agro-Industrial Nacional</button></li>
-                <li><button onClick={() => setActiveTab('producer')} className="hover:text-amber-400 transition text-left cursor-pointer">Portal do Produtor & Cooperativas</button></li>
-                <li><button onClick={() => setActiveTab('logistics')} className="hover:text-amber-400 transition text-left cursor-pointer">AO Logistics (Bolsa Rodoviária & PIN OTP)</button></li>
-                <li><button onClick={() => setActiveTab('social_protection')} className="hover:text-amber-400 transition text-left cursor-pointer">Segurança Social (INSS • D.P. 227/18)</button></li>
-                <li><button onClick={() => setActiveTab('disputes')} className="hover:text-amber-400 transition text-left cursor-pointer">AO Protect (Custódia & Mediação)</button></li>
+              <span className="font-bold text-white uppercase tracking-wider text-[11px] block">
+                Pilares do Ecossistema
+              </span>
+              <ul className="space-y-2 text-[#94a3b8]">
+                <li><button onClick={() => setActiveTab('marketplace')} className="hover:text-white transition">Catálogo Nacional de Produtos</button></li>
+                <li><button onClick={() => setActiveTab('producer')} className="hover:text-white transition">Registo de Colheitas & Produtores</button></li>
+                <li><button onClick={() => setActiveTab('merchant')} className="hover:text-white transition">Cotações Grossistas (RFQ)</button></li>
+                <li><button onClick={() => setActiveTab('logistics')} className="hover:text-white transition">Bolsa de Fretes AO Logistics</button></li>
+                <li><button onClick={() => setActiveTab('social_protection')} className="hover:text-white transition">Proteção Social & INSS</button></li>
+                <li><button onClick={() => setActiveTab('disputes')} className="hover:text-white transition">Mediação Segura AO Protect</button></li>
               </ul>
             </div>
 
             {/* Column 3 */}
             <div className="space-y-2.5">
-              <h4 className="font-bold text-[#f8fafc] uppercase tracking-wider text-[11px]">Pólos Produtivos & Corredores</h4>
-              <ul className="space-y-1.5 text-[#94a3b8] text-xs">
-                <li><strong className="text-[#cbd5e1]">Planalto Central (Huambo/Bié):</strong> Milho, Trigo e Hortícolas</li>
-                <li><strong className="text-[#cbd5e1]">Cuanza Sul (Amboim/Gabela):</strong> Café Genuíno de Altitude</li>
-                <li><strong className="text-[#cbd5e1]">Bengo (Caxito/Dande):</strong> Banana Pão e Frutícolas</li>
-                <li><strong className="text-[#cbd5e1]">Sul (Huíla/Namibe):</strong> Pecuária, Tomate e Pesca/Salga</li>
-                <li><strong className="text-[#cbd5e1]">Malanje (Capanda):</strong> Mandioca, Soja e Cana-de-Açúcar</li>
+              <span className="font-bold text-white uppercase tracking-wider text-[11px] block">
+                Garantias & Conformidade
+              </span>
+              <ul className="space-y-2 text-[#94a3b8]">
+                <li className="flex items-center space-x-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Custódia Regulada (BNA / EMIS)</span>
+                </li>
+                <li className="flex items-center space-x-1.5">
+                  <Truck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Rastreio de Frota Nacional</span>
+                </li>
+                <li className="flex items-center space-x-1.5">
+                  <Award className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span>Registo Oficial no INSS</span>
+                </li>
+                <li className="flex items-center space-x-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <span>Validação de NIF com AGT</span>
+                </li>
               </ul>
             </div>
 
             {/* Column 4 */}
-            <div className="space-y-3.5">
-              <h4 className="font-bold text-[#f8fafc] uppercase tracking-wider text-[11px]">Garantias & Conformidade</h4>
-              <div className="bg-[#131b2e] p-3.5 rounded-xl border border-[#1e293b] space-y-1.5">
-                <div className="flex items-center text-emerald-400 font-bold text-xs">
-                  <ShieldCheck className="w-4 h-4 mr-1.5" />
-                  Custódia Bancária Garantida
+            <div className="space-y-3">
+              <span className="font-bold text-white uppercase tracking-wider text-[11px] block">
+                Cobertura Territorial
+              </span>
+              <p className="text-[#94a3b8] text-xs">
+                Operação ativa em 18 províncias e 164 municípios com rotas rodoviárias integradas.
+              </p>
+              <div className="p-3 bg-[#050914] rounded-xl border border-[#1e293b] space-y-1">
+                <div className="text-[11px] text-white font-semibold flex items-center justify-between">
+                  <span>Conexão Cloud Firebase</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 </div>
-                <p className="text-[11px] text-[#94a3b8] leading-relaxed">
-                  Os valores liquidados ficam retidos sob mediação bancária até à receção física do lote e validação do PIN OTP no ato da entrega.
-                </p>
-              </div>
-
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleOpenAuth('REGISTER')}
-                  className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs rounded-lg transition text-center cursor-pointer shadow-sm"
-                >
-                  Cadastrar Conta
-                </button>
-                <button
-                  onClick={() => setIsArchitectureOpen(true)}
-                  className="flex-1 py-2 bg-[#131b2e] hover:bg-[#1e293b] text-amber-300 text-xs font-bold rounded-lg border border-amber-500/30 transition text-center cursor-pointer"
-                >
-                  Quadro Oficial
-                </button>
+                <div className="text-[10px] text-slate-400 font-mono">
+                  Sincronização em Tempo Real Ativa
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[#64748b] text-[11px]">
+          {/* Copyright & Disclaimer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-[#64748b] text-[11px]">
             <div>
-              © 2026 REPÚBLICA DE ANGOLA • AO MARKET. Todos os direitos reservados.
+              © 2026 AO MARKET — República de Angola. Plataforma Nacional de Comércio Agro-Industrial e Logística Rodoviária.
             </div>
-            <div className="flex items-center space-x-3 text-xs">
-              <span className="text-[#cbd5e1] font-mono">Kwanza (AOA)</span>
+            <div className="flex items-center space-x-4">
+              <span>Luanda • Huambo • Benguela • Huíla</span>
               <span>•</span>
-              <span className="text-emerald-400 font-medium">INSS & PREI Integrados</span>
-              <span>•</span>
-              <span className="text-[#cbd5e1]">18 Províncias de Angola</span>
+              <button 
+                onClick={() => setIsArchitectureOpen(true)}
+                className="text-[#94a3b8] hover:text-white underline cursor-pointer"
+              >
+                Manual de Arquitetura Soberana
+              </button>
             </div>
           </div>
         </div>
@@ -382,10 +408,12 @@ const MainAppContent: React.FC = () => {
   );
 };
 
-export default function App() {
+export const App: React.FC = () => {
   return (
     <MarketProvider>
       <MainAppContent />
     </MarketProvider>
   );
-}
+};
+
+export default App;

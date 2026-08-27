@@ -6,11 +6,13 @@ import {
   Layers, 
   CheckCircle2, 
   Building2,
-  X
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import { ANGOLA_PROVINCES } from '../data/angolaGeoData';
 import { ProductCategory } from '../types';
+import { RealImageUploader } from './RealImageUploader';
 
 export const ProducerPortal: React.FC = () => {
   const { currentUser, products, addNewProduct, formatKz } = useMarket();
@@ -32,6 +34,7 @@ export const ProducerPortal: React.FC = () => {
   const [harvestDate, setHarvestDate] = useState(new Date().toISOString().slice(0, 10));
   const [b2bTierMin, setB2bTierMin] = useState<number>(30);
   const [b2bTierPrice, setB2bTierPrice] = useState<number>(13500);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
 
   // My products
   const myProducts = products.filter(p => p.producerId === currentUser.id);
@@ -52,7 +55,7 @@ export const ProducerPortal: React.FC = () => {
       originMunicipality,
       farmOrFactoryName,
       isProducedInAngola: true,
-      images: ['https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=800&q=80'],
+      images: uploadedImages.length > 0 ? uploadedImages : [],
       producerId: currentUser.id,
       producerName: currentUser.name,
       producerVerification: currentUser.verificationLevel,
@@ -66,6 +69,7 @@ export const ProducerPortal: React.FC = () => {
     setShowAddForm(false);
     setTitle('');
     setDescription('');
+    setUploadedImages([]);
   };
 
   return (
@@ -252,6 +256,19 @@ export const ProducerPortal: React.FC = () => {
                 className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs font-mono focus:border-slate-500 focus:outline-none"
               />
             </div>
+
+            {/* Real Image Uploader connecting directly to Firebase Storage */}
+            <div className="sm:col-span-2 lg:col-span-3 pt-2">
+              <RealImageUploader
+                label="Fotografias Reais do Lote / Colheita (Firebase Storage)"
+                helperText="Carregue fotos reais tiradas diretamente no campo, fazenda ou armazém para verificação e transparência"
+                folder="products"
+                multiple={true}
+                maxFiles={4}
+                initialImages={uploadedImages}
+                onImagesChange={setUploadedImages}
+              />
+            </div>
           </div>
 
           <div className="pt-3 flex justify-end space-x-2 border-t border-slate-100">
@@ -266,7 +283,7 @@ export const ProducerPortal: React.FC = () => {
               type="submit"
               className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-xs"
             >
-              Publicar Produto
+              Publicar Produto com Fotos Reais
             </button>
           </div>
         </form>
@@ -298,14 +315,27 @@ export const ProducerPortal: React.FC = () => {
             {myProducts.map(prod => (
               <div key={prod.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-slate-50 transition">
                 <div className="flex items-center space-x-3">
-                  <img
-                    src={prod.images[0]}
-                    alt={prod.title}
-                    referrerPolicy="no-referrer"
-                    className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-200"
-                  />
+                  {prod.images && prod.images[0] ? (
+                    <img
+                      src={prod.images[0]}
+                      alt={prod.title}
+                      referrerPolicy="no-referrer"
+                      className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                      <Sprout className="w-6 h-6 text-emerald-600" />
+                    </div>
+                  )}
                   <div>
-                    <div className="font-bold text-slate-900 text-xs sm:text-sm">{prod.title}</div>
+                    <div className="font-bold text-slate-900 text-xs sm:text-sm flex items-center space-x-2">
+                      <span>{prod.title}</span>
+                      {prod.images && prod.images.length > 0 && (
+                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold rounded">
+                          {prod.images.length} {prod.images.length === 1 ? 'foto real' : 'fotos reais'}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-slate-500 text-xs mt-0.5">
                       {prod.originMunicipality}, {prod.originProvince} · Stock: <strong className="text-slate-800 font-mono">{prod.availableStock} {prod.unit}</strong>
                     </div>

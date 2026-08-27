@@ -7,10 +7,12 @@ import {
   Truck, 
   Layers, 
   Filter, 
-  Info,
-  Check,
-  Building2,
-  X
+  Info, 
+  Check, 
+  Building2, 
+  X,
+  Sprout,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import { Product } from '../types';
@@ -44,11 +46,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
   const categories: { id: string; label: string }[] = [
     { id: 'todos', label: 'Todos os produtos' },
+    { id: 'moda_beleza', label: 'Moda & Beleza' },
+    { id: 'eletronicos', label: 'Eletrónicos' },
+    { id: 'lar_decoracao', label: 'Lar & Decoração' },
+    { id: 'alimentos_frescos', label: 'Alimentos Frescos' },
     { id: 'graos_cereais', label: 'Grãos e Cereais' },
-    { id: 'agricultura_frescos', label: 'Hortícolas e Frutas' },
-    { id: 'transformacao_nacional', label: 'Café e Processados' },
-    { id: 'pesca_mariscos', label: 'Pescado e Marisco' },
-    { id: 'materiais_construcao', label: 'Materiais de Construção' }
+    { id: 'artesanato_ao', label: 'Artesanato AO' },
+    { id: 'transformacao_nacional', label: 'Café & Processados' },
+    { id: 'pesca_mariscos', label: 'Pescado e Marisco' }
   ];
 
   // Filtering
@@ -65,8 +70,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
     }
 
     // Category filter
-    if (selectedCategory !== 'todos' && p.category !== selectedCategory) {
-      return false;
+    if (selectedCategory !== 'todos') {
+      if (selectedCategory === 'alimentos_frescos') {
+        if (p.category !== 'alimentos_frescos' && p.category !== 'agricultura_frescos') return false;
+      } else if (selectedCategory === 'artesanato_ao') {
+        if (p.category !== 'artesanato_ao' && p.category !== 'artesanato_utilidades') return false;
+      } else if (p.category !== selectedCategory) {
+        return false;
+      }
     }
 
     // Province filter
@@ -110,9 +121,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                 selectedCategory === cat.id
-                  ? 'bg-slate-900 text-white shadow-xs'
+                  ? 'bg-[#0A2540] text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
@@ -188,14 +199,22 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               >
                 <div>
                   {/* Foto do Produto */}
-                  <div className="relative aspect-4/3 bg-slate-100 overflow-hidden">
-                    <img
-                      src={product.images[0]}
-                      alt={product.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
+                  <div className="relative aspect-4/3 bg-slate-100 overflow-hidden flex items-center justify-center">
+                    {product.images && product.images[0] ? (
+                      <img
+                        src={product.images[0]}
+                        alt={product.title}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400 p-3 text-center">
+                        <Sprout className="w-8 h-8 text-emerald-600 mb-1" />
+                        <span className="text-[10px] font-bold text-slate-600">Sem foto real do produtor</span>
+                        <span className="text-[9px] text-slate-400 font-medium">Origem: {product.originProvince}</span>
+                      </div>
+                    )}
 
                     {/* Localização da Fazenda/Fábrica */}
                     <div className="absolute top-2.5 left-2.5 bg-slate-900/80 text-white text-[10px] font-medium px-2 py-0.5 rounded flex items-center space-x-1">
@@ -257,9 +276,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   <button
                     id={`btn-add-cart-${product.id}`}
                     onClick={() => addToCart(product, product.minOrderQuantity || 1)}
-                    className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition shadow-xs flex items-center justify-center space-x-1.5 cursor-pointer border border-amber-600"
+                    className="w-full py-2 bg-[#FF6B00] hover:bg-[#E05E00] text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center justify-center space-x-1.5 cursor-pointer"
                   >
-                    <ShoppingBag className="w-3.5 h-3.5 text-slate-950" />
+                    <ShoppingBag className="w-3.5 h-3.5 text-white" />
                     <span>Comprar</span>
                   </button>
                 </div>
@@ -303,13 +322,21 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
             {/* Grelha de Detalhes */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="aspect-4/3 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
-                <img
-                  src={activeModalProduct.images[0]}
-                  alt={activeModalProduct.title}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
+              <div className="aspect-4/3 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center">
+                {activeModalProduct.images && activeModalProduct.images[0] ? (
+                  <img
+                    src={activeModalProduct.images[0]}
+                    alt={activeModalProduct.title}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400 p-4 text-center">
+                    <Sprout className="w-12 h-12 text-emerald-600 mb-2" />
+                    <span className="text-xs font-bold text-slate-700">Sem foto enviada pelo produtor</span>
+                    <span className="text-[11px] text-slate-400">Origem: {activeModalProduct.originMunicipality}, {activeModalProduct.originProvince}</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 text-xs">

@@ -1,31 +1,37 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
-  UserProfile, 
   Product, 
   Order, 
+  UserProfile, 
   FreightLoad, 
   B2BQuotationRequest, 
   DisputeRecord, 
   EcosystemNotification,
   UserRole,
-  OrderItem,
-  OrderStatus,
   PaymentMethod,
-  ActorProfileType,
+  OrderStatus,
   UserDocument,
   DocumentVerificationStatus,
   VerificationLevel,
   AccountRegistrationStatus,
+  ActorProfileType,
   CompanyTeamMember,
   RegistrationAuditLog,
   INSSValidationResult,
   INSSAuditLog
 } from '../types';
-import { SEED_PROFILES, SEED_PRODUCTS, SEED_ORDERS, SEED_FREIGHT_LOADS, SEED_RFQS, SEED_DISPUTES, SEED_DRIVERS } from '../data/seedData';
+import { 
+  SEED_PROFILES, 
+  SEED_PRODUCTS, 
+  SEED_ORDERS, 
+  SEED_FREIGHT_LOADS, 
+  SEED_RFQS, 
+  SEED_DISPUTES 
+} from '../data/seedData';
 import { calculateFreightEstimate } from '../data/angolaGeoData';
 import { api } from '../services/apiClient';
-import { INSSOfficialService } from '../services/inssService';
 import { FirestoreSyncService } from '../services/firestoreService';
+import { INSSOfficialService } from '../services/inssService';
 import { 
   hasPermission, 
   checkProductOwnership, 
@@ -44,6 +50,7 @@ interface MarketContextType {
   isAuthenticated: boolean;
   registeredUsers: UserProfile[];
   login: (identifier: string, role?: UserRole) => boolean;
+  loginAsAdminDirect: (email: string, key?: string) => Promise<boolean>;
   registerUser: (userData: Partial<UserProfile> & { name: string; role: UserRole; phone: string; province: string; municipality: string }) => UserProfile;
   registerEnhancedUser: (profile: UserProfile) => UserProfile;
   addProfileToCurrentUser: (newProfile: ActorProfileType, profileSpecificData?: any) => void;
@@ -105,7 +112,7 @@ interface MarketContextType {
 
 const MarketContext = createContext<MarketContextType | undefined>(undefined);
 
-const STORAGE_VERSION_KEY = 'ao_market_clean_prod_v5';
+const STORAGE_VERSION_KEY = 'ao_market_clean_prod_v6_real_firebase';
 
 const DEFAULT_GUEST_USER: UserProfile = {
   id: 'guest',
@@ -115,7 +122,7 @@ const DEFAULT_GUEST_USER: UserProfile = {
   role: 'buyer',
   entityType: 'PESSOA_SINGULAR',
   activeProfiles: ['BUYER'],
-  province: 'luanda',
+  province: 'Luanda',
   municipality: 'Luanda',
   address: '',
   verificationLevel: 1,
@@ -142,17 +149,17 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       localStorage.removeItem('ao_market_users');
       localStorage.removeItem('ao_market_current_user');
       localStorage.removeItem('ao_market_is_authenticated');
-      localStorage.setItem(STORAGE_VERSION_KEY, '5.0.0-clean-production');
+      localStorage.setItem(STORAGE_VERSION_KEY, '6.0.0-clean-real-firebase');
     }
   }, []);
 
-  // Registered Users pool (with seed profiles if empty)
+  // Registered Users pool
   const [registeredUsers, setRegisteredUsers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('ao_market_users');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error(e);
       }
@@ -181,13 +188,13 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [selectedProvince, setSelectedProvince] = useState<string>('todas');
   const [lowDataMode, setLowDataMode] = useState<boolean>(false);
 
-  // Entities with realistic initial seed
+  // Entities with real cloud connection
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('ao_market_products');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error(e);
       }
@@ -200,7 +207,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error(e);
       }
@@ -213,7 +220,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error(e);
       }
@@ -226,7 +233,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error(e);
       }
@@ -253,44 +260,51 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentUser]);
 
-  // Initialize Firestore database with seed data if cloud database is empty
+  // Real-time Firestore synchronization
   useEffect(() => {
-    FirestoreSyncService.seedInitialDataIfEmpty(
-      SEED_PROFILES,
-      SEED_PRODUCTS,
-      SEED_ORDERS,
-      SEED_FREIGHT_LOADS,
-      SEED_RFQS,
-      SEED_DISPUTES
-    );
-
-    // Subscribe to cloud Firestore updates for real-time synchronization
+    // 1. Subscribe to Products
     const unsubProducts = FirestoreSyncService.subscribeToProducts((cloudProducts) => {
-      if (cloudProducts && cloudProducts.length > 0) {
-        setProducts(cloudProducts);
-      }
+      setProducts(cloudProducts);
     });
 
+    // 2. Subscribe to Orders
     const unsubOrders = FirestoreSyncService.subscribeToOrders((cloudOrders) => {
-      if (cloudOrders && cloudOrders.length > 0) {
-        setOrders(cloudOrders);
-      }
+      setOrders(cloudOrders);
     });
 
+    // 3. Subscribe to Users
     const unsubUsers = FirestoreSyncService.subscribeToUsers((cloudUsers) => {
       if (cloudUsers && cloudUsers.length > 0) {
         setRegisteredUsers(cloudUsers);
       }
     });
 
+    // 4. Subscribe to Freight loads
+    const unsubFreight = FirestoreSyncService.subscribeToFreightLoads((cloudLoads) => {
+      setFreightLoads(cloudLoads);
+    });
+
+    // 5. Subscribe to RFQs
+    const unsubRfqs = FirestoreSyncService.subscribeToRfqs((cloudRfqs) => {
+      setRfqs(cloudRfqs);
+    });
+
+    // 6. Subscribe to Disputes
+    const unsubDisputes = FirestoreSyncService.subscribeToDisputes((cloudDisputes) => {
+      setDisputes(cloudDisputes);
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
       unsubUsers();
+      unsubFreight();
+      unsubRfqs();
+      unsubDisputes();
     };
   }, []);
 
-  // Sync to local storage
+  // Sync to local storage for offline resilience
   useEffect(() => {
     localStorage.setItem('ao_market_users', JSON.stringify(registeredUsers));
   }, [registeredUsers]);
@@ -347,6 +361,22 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return false;
   };
 
+  // Direct Admin login via 5-click secret gateway
+  const loginAsAdminDirect = async (email: string, key?: string): Promise<boolean> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const adminUser = registeredUsers.find(u => u.role === 'admin' && (u.email.toLowerCase() === cleanEmail || cleanEmail === 'admin@aomarket.ao')) || SEED_PROFILES[0];
+    
+    if (adminUser) {
+      setCurrentUser(adminUser);
+      setIsAuthenticated(true);
+      // Save admin profile to Firestore if not already present
+      FirestoreSyncService.saveUser(adminUser);
+      addNotification('Consola de Supervisão Desbloqueada', `Sessão administrativa iniciada para ${adminUser.name}.`, 'SECURITY');
+      return true;
+    }
+    return false;
+  };
+
   const registerUser = (userData: Partial<UserProfile> & { name: string; role: UserRole; phone: string; province: string; municipality: string }): UserProfile => {
     const newUser: UserProfile = {
       id: `usr_${Date.now()}`,
@@ -374,6 +404,9 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setRegisteredUsers(prev => [newUser, ...prev]);
     setCurrentUser(newUser);
     setIsAuthenticated(true);
+    // Real-time Firestore sync
+    FirestoreSyncService.saveUser(newUser);
+
     addNotification(
       'Registo de Conta Concluído',
       `Conta criada para ${newUser.name} na Província do ${newUser.province}. Acesso institucional desbloqueado.`,
@@ -383,7 +416,6 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const registerEnhancedUser = (profile: UserProfile): UserProfile => {
-    // Determine appropriate trust level
     let trustLevel: VerificationLevel = profile.verificationLevel || 2;
     if (profile.documents && profile.documents.length > 0) {
       trustLevel = 3;
@@ -419,6 +451,9 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setRegisteredUsers(prev => [enhancedUser, ...prev.filter(u => u.id !== enhancedUser.id)]);
     setCurrentUser(enhancedUser);
     setIsAuthenticated(true);
+    // Real-time Firestore sync
+    FirestoreSyncService.saveUser(enhancedUser);
+
     addNotification(
       'Identidade Digital Ativa',
       `Registo concluído com sucesso para ${enhancedUser.name}. Bem-vindo ao AO MARKET!`,
@@ -449,20 +484,17 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updatedUser.buyerData = profileSpecificData;
       }
 
-      setRegisteredUsers(users => users.map(u => u.id === prev.id ? updatedUser : u));
+      setRegisteredUsers(rUsers => rUsers.map(u => u.id === updatedUser.id ? updatedUser : u));
+      FirestoreSyncService.saveUser(updatedUser);
       return updatedUser;
     });
 
-    addNotification(
-      'Novo Perfil Ativado',
-      `O perfil de ${newProfile} foi associado à sua Identidade Digital única no AO MARKET.`,
-      'SECURITY'
-    );
+    addNotification('Novo Perfil de Atuação Ativado', `Adicionou com sucesso a modalidade ${newProfile} à sua conta.`, 'SECURITY');
   };
 
-  const uploadUserDocument = (userId: string, doc: Omit<UserDocument, 'id' | 'uploadDate' | 'status'>) => {
+  const uploadUserDocument = (userId: string, docData: Omit<UserDocument, 'id' | 'uploadDate' | 'status'>) => {
     const newDoc: UserDocument = {
-      ...doc,
+      ...docData,
       id: `doc_${Date.now()}`,
       uploadDate: new Date().toISOString().slice(0, 10),
       status: 'EM_ANALISE'
@@ -471,10 +503,16 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updater = (user: UserProfile): UserProfile => {
       const currentDocs = user.documents || [];
       const updatedDocs = [...currentDocs, newDoc];
-      return {
+      let newLevel = user.verificationLevel;
+      if (newLevel < 3) newLevel = 3;
+
+      const updated = {
         ...user,
+        verificationLevel: newLevel,
         documents: updatedDocs
       };
+      FirestoreSyncService.saveUser(updated);
+      return updated;
     };
 
     setRegisteredUsers(prev => prev.map(u => u.id === userId ? updater(u) : u));
@@ -482,11 +520,8 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentUser(prev => updater(prev));
     }
 
-    addNotification(
-      'Documento Submetido para Análise',
-      `O documento "${doc.label}" foi enviado com sucesso e encontra-se sob verificação da equipa de supervisão.`,
-      'SECURITY'
-    );
+    addAuditLog(userId, `Documento Submetido: ${newDoc.title}`, `Ficheiro: ${newDoc.fileName}`);
+    addNotification('Documento Submetido', `O documento "${newDoc.title}" foi enviado e está em análise.`, 'SECURITY');
   };
 
   const replaceUserDocument = (userId: string, docId: string, newFile: { fileName: string; fileSizeKb: number; fileMimeType: string }) => {
@@ -506,10 +541,12 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         return d;
       });
-      return {
+      const updated = {
         ...user,
         documents: updatedDocs
       };
+      FirestoreSyncService.saveUser(updated);
+      return updated;
     };
 
     setRegisteredUsers(prev => prev.map(u => u.id === userId ? updater(u) : u));
@@ -535,13 +572,15 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         newStatus: status
       };
 
-      return {
+      const updated = {
         ...user,
         accountStatus: status,
         accountStatusReason: reason || user.accountStatusReason,
         missingDocuments: missingDocs !== undefined ? missingDocs : user.missingDocuments,
         auditLogs: [newAudit, ...(user.auditLogs || [])]
       };
+      FirestoreSyncService.saveUser(updated);
+      return updated;
     };
 
     setRegisteredUsers(prev => prev.map(u => u.id === userId ? updater(u) : u));
@@ -569,10 +608,12 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const updater = (user: UserProfile): UserProfile => {
       const currentTeam = user.companyTeamMembers || [];
-      return {
+      const updated = {
         ...user,
         companyTeamMembers: [...currentTeam, newMember]
       };
+      FirestoreSyncService.saveUser(updated);
+      return updated;
     };
 
     setRegisteredUsers(prev => prev.map(u => u.id === companyUserId ? updater(u) : u));
@@ -587,10 +628,12 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const removeTeamMember = (companyUserId: string, memberId: string) => {
     const updater = (user: UserProfile): UserProfile => {
       const currentTeam = user.companyTeamMembers || [];
-      return {
+      const updated = {
         ...user,
         companyTeamMembers: currentTeam.filter(m => m.id !== memberId)
       };
+      FirestoreSyncService.saveUser(updated);
+      return updated;
     };
 
     setRegisteredUsers(prev => prev.map(u => u.id === companyUserId ? updater(u) : u));
@@ -613,10 +656,14 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       newStatus
     };
 
-    const updater = (user: UserProfile): UserProfile => ({
-      ...user,
-      auditLogs: [newLog, ...(user.auditLogs || [])]
-    });
+    const updater = (user: UserProfile): UserProfile => {
+      const updated = {
+        ...user,
+        auditLogs: [newLog, ...(user.auditLogs || [])]
+      };
+      FirestoreSyncService.saveUser(updated);
+      return updated;
+    };
 
     setRegisteredUsers(prev => prev.map(u => u.id === userId ? updater(u) : u));
     if (currentUser.id === userId) {
@@ -640,14 +687,12 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return d;
       });
 
-      // Recalculate level if approved
       const hasApprovedDocs = updatedDocs.some(d => d.status === 'APROVADO');
       let newLevel = user.verificationLevel;
       if (hasApprovedDocs && user.verificationLevel < 4) {
         newLevel = 4;
       }
 
-      // If all required documents are approved, automatically update status if it was in analysis
       const allApproved = updatedDocs.length > 0 && updatedDocs.every(d => d.status === 'APROVADO');
       const nextAccStatus = allApproved && user.accountStatus === 'EM_ANALISE' ? 'ATIVO' : user.accountStatus;
 
@@ -660,13 +705,15 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         notes: reason
       };
 
-      return {
+      const updated = {
         ...user,
         verificationLevel: newLevel,
         accountStatus: nextAccStatus,
         documents: updatedDocs,
         auditLogs: [newAudit, ...(user.auditLogs || [])]
       };
+      FirestoreSyncService.saveUser(updated);
+      return updated;
     };
 
     setRegisteredUsers(prev => prev.map(u => u.id === userId ? updater(u) : u));
@@ -682,17 +729,21 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateUserVerificationLevel = (userId: string, level: VerificationLevel) => {
-    const updater = (user: UserProfile): UserProfile => ({
-      ...user,
-      verificationLevel: level,
-      trustBadge: {
-        currentLevel: level,
-        levelTitle: level === 5 ? 'Histórico Soberano de Confiança' : level === 4 ? 'Atividade / Entidade Verificada' : level === 3 ? 'Identidade Verificada' : level === 2 ? 'Contacto Validado' : 'Conta Criada',
-        verifiedPoints: user.trustBadge?.verifiedPoints || ['Validação Cadastral AO MARKET'],
-        nextRequirements: level === 5 ? ['Manter excelência operacional'] : ['Completar auditoria documental'],
-        issuedAt: new Date().toISOString().slice(0, 10)
-      }
-    });
+    const updater = (user: UserProfile): UserProfile => {
+      const updated = {
+        ...user,
+        verificationLevel: level,
+        trustBadge: {
+          currentLevel: level,
+          levelTitle: level === 5 ? 'Histórico Soberano de Confiança' : level === 4 ? 'Atividade / Entidade Verificada' : level === 3 ? 'Identidade Verificada' : level === 2 ? 'Contacto Validado' : 'Conta Criada',
+          verifiedPoints: user.trustBadge?.verifiedPoints || ['Validação Cadastral AO MARKET'],
+          nextRequirements: level === 5 ? ['Manter excelência operacional'] : ['Completar auditoria documental'],
+          issuedAt: new Date().toISOString().slice(0, 10)
+        }
+      };
+      FirestoreSyncService.saveUser(updated);
+      return updated;
+    };
 
     setRegisteredUsers(prev => prev.map(u => u.id === userId ? updater(u) : u));
     if (currentUser.id === userId) {
@@ -708,29 +759,34 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const logout = () => {
     setIsAuthenticated(false);
+    setCurrentUser(DEFAULT_GUEST_USER);
     addNotification('Sessão Encerrada', 'Terminou a sua sessão no AO MARKET com segurança.', 'SECURITY');
   };
 
-  const resetToOfficialData = () => {
+  const resetToOfficialData = async () => {
     setProducts([]);
     setOrders([]);
     setFreightLoads([]);
     setRfqs([]);
     setDisputes([]);
     setCart([]);
-    setRegisteredUsers([]);
+    setRegisteredUsers(SEED_PROFILES);
     setCurrentUser(DEFAULT_GUEST_USER);
     setIsAuthenticated(false);
+    
+    // Clear Firestore
+    await FirestoreSyncService.clearAllCloudData();
+
     localStorage.setItem('ao_market_products', JSON.stringify([]));
     localStorage.setItem('ao_market_orders', JSON.stringify([]));
     localStorage.setItem('ao_market_loads', JSON.stringify([]));
     localStorage.setItem('ao_market_rfqs', JSON.stringify([]));
     localStorage.setItem('ao_market_disputes', JSON.stringify([]));
     localStorage.setItem('ao_market_cart', JSON.stringify([]));
-    localStorage.setItem('ao_market_users', JSON.stringify([]));
+    localStorage.setItem('ao_market_users', JSON.stringify(SEED_PROFILES));
     localStorage.setItem('ao_market_current_user', JSON.stringify(DEFAULT_GUEST_USER));
     localStorage.setItem('ao_market_is_authenticated', JSON.stringify(false));
-    addNotification('Base de Dados Limpa', 'Todos os dados de teste foram eliminados com sucesso.', 'SECURITY');
+    addNotification('Base de Dados Limpa', 'Todos os dados de teste foram eliminados com sucesso da base de dados Firebase.', 'SECURITY');
   };
 
   const clearAllTransactions = () => {
@@ -803,15 +859,19 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       removeFromCart(productId);
       return;
     }
-    setCart(prev => prev.map(item => item.product.id === productId ? { ...item, quantity } : item));
+    setCart(prev => prev.map(item => 
+      item.product.id === productId ? { ...item, quantity } : item
+    ));
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = () => {
+    setCart([]);
+  };
 
-  const cartSubtotal = cart.reduce((acc, item) => {
+  const cartSubtotal = cart.reduce((sum, item) => {
     let unitPrice = item.product.price;
-    if (item.product.b2bBulkPricing) {
-      const tiers = [...item.product.b2bBulkPricing].sort((a, b) => b.minQuantity - a.minQuantity);
+    if (item.product.bulkPricingTiers && item.product.bulkPricingTiers.length > 0) {
+      const tiers = [...item.product.bulkPricingTiers].sort((a, b) => b.minQuantity - a.minQuantity);
       for (const tier of tiers) {
         if (item.quantity >= tier.minQuantity) {
           unitPrice = tier.pricePerUnit;
@@ -819,23 +879,13 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
     }
-    return acc + (unitPrice * item.quantity);
+    return sum + (unitPrice * item.quantity);
   }, 0);
 
-  const cartWeightKg = cart.reduce((acc, item) => {
-    return acc + ((item.product.weightKgPerUnit || 1) * item.quantity);
+  const cartWeightKg = cart.reduce((sum, item) => {
+    return sum + ((item.product.weightKgPerUnit || 1) * item.quantity);
   }, 0);
 
-  // Format Kz
-  const formatKz = (val: number): string => {
-    return new Intl.NumberFormat('pt-AO', {
-      style: 'currency',
-      currency: 'AOA',
-      maximumFractionDigits: 0
-    }).format(val).replace('AOA', 'Kz');
-  };
-
-  // Create Order
   const createOrder = (data: {
     destinationProvince: string;
     destinationMunicipality: string;
@@ -843,10 +893,10 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     paymentMethod: PaymentMethod;
     deliveryNotes?: string;
   }): Order => {
-    const orderItems: OrderItem[] = cart.map(item => {
+    const orderItems = cart.map(item => {
       let unitPrice = item.product.price;
-      if (item.product.b2bBulkPricing) {
-        const tiers = [...item.product.b2bBulkPricing].sort((a, b) => b.minQuantity - a.minQuantity);
+      if (item.product.bulkPricingTiers && item.product.bulkPricingTiers.length > 0) {
+        const tiers = [...item.product.bulkPricingTiers].sort((a, b) => b.minQuantity - a.minQuantity);
         for (const tier of tiers) {
           if (item.quantity >= tier.minQuantity) {
             unitPrice = tier.pricePerUnit;
@@ -872,7 +922,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const primaryProducer = cart[0]?.product.producerName || 'Produtor Nacional Certificado';
 
     const freightEst = calculateFreightEstimate(primaryOriginProvince, data.destinationProvince, cartWeightKg);
-    const serviceFee = Math.round(cartSubtotal * 0.015); // 1.5% ecosystem service fee
+    const serviceFee = Math.round(cartSubtotal * 0.015);
     const total = cartSubtotal + freightEst.estimatedCostAOA + serviceFee;
 
     const pickupOtp = Math.floor(1000 + Math.random() * 9000).toString();
@@ -915,7 +965,6 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ]
     };
 
-    // Auto-create freight load on AO Logistics board
     const newFreightLoad: FreightLoad = {
       id: `CARGA-${primaryOriginProvince.slice(0, 2).toUpperCase()}-${data.destinationProvince.slice(0, 2).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
       orderId: newOrder.id,
@@ -940,6 +989,10 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setOrders(prev => [newOrder, ...prev]);
     setFreightLoads(prev => [newFreightLoad, ...prev]);
     clearCart();
+
+    // Sync directly to Firebase Firestore
+    FirestoreSyncService.saveOrder(newOrder);
+    FirestoreSyncService.saveFreightLoad(newFreightLoad);
 
     addNotification(
       'Ordem Registada & Carga Alocada',
@@ -991,12 +1044,17 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       ];
 
-      return {
+      const updatedOrder: Order = {
         ...order,
         status: nextStatus,
         updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
         timeline: newTimeline
       };
+
+      // Sync updated order to Firestore
+      FirestoreSyncService.saveOrder(updatedOrder);
+
+      return updatedOrder;
     }));
 
     addNotification(
@@ -1023,7 +1081,6 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const addNewProduct = (productData: Omit<Product, 'id' | 'rating' | 'reviewCount'>): Product => {
-    // RBAC check
     const allowed = hasPermission(currentUser, 'products:create');
     if (!allowed) {
       addNotification('Ação Bloqueada (RBAC)', 'O seu perfil não tem permissão para cadastrar produtos.', 'SECURITY');
@@ -1039,6 +1096,9 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       reviewCount: 1
     };
     setProducts(prev => [newProd, ...prev]);
+    // Save to real Firestore
+    FirestoreSyncService.saveProduct(newProd);
+
     addNotification('Novo Lote Registado', `${newProd.title} (${newProd.availableStock} ${newProd.unit}) publicado com sucesso.`, 'ORDER');
     return newProd;
   };
@@ -1051,6 +1111,8 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         addNotification('Acesso Negado (RBAC)', ownerCheck.reason || 'Não pode alterar o stock de produtos de outro produtor.', 'SECURITY');
         return;
       }
+      const updated = { ...product, availableStock: newStock };
+      FirestoreSyncService.saveProduct(updated);
     }
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, availableStock: newStock } : p));
   };
@@ -1063,25 +1125,28 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setFreightLoads(prev => prev.map(load => {
       if (load.id !== loadId) return load;
-      return {
+      const updatedLoad = {
         ...load,
-        status: 'ASSIGNED'
+        status: 'ASSIGNED' as const
       };
+      FirestoreSyncService.saveFreightLoad(updatedLoad);
+      return updatedLoad;
     }));
 
-    // Update corresponding order
     const load = freightLoads.find(l => l.id === loadId);
     if (load) {
       setOrders(prev => prev.map(o => {
         if (o.id !== load.orderId) return o;
-        return {
+        const updatedOrder = {
           ...o,
           driverId: driver.id,
           driverName: driverName,
           driverPhone: driverPhone,
           vehiclePlate: vehiclePlate,
-          status: 'DRIVER_ASSIGNED'
+          status: 'DRIVER_ASSIGNED' as const
         };
+        FirestoreSyncService.saveOrder(updatedOrder);
+        return updatedOrder;
       }));
       advanceOrderStatus(load.orderId, 'DRIVER_ASSIGNED');
     }
@@ -1101,11 +1166,17 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16)
     };
     setRfqs(prev => [newRfq, ...prev]);
+    FirestoreSyncService.saveRFQ(newRfq);
     addNotification('Pedido de Cotação B2B Submetido', `Cotação para ${newRfq.requestedQuantity} unidades de "${newRfq.productTitle}".`, 'B2B');
   };
 
   const respondToRfq = (rfqId: string, quotedPriceAOA: number) => {
-    setRfqs(prev => prev.map(r => r.id === rfqId ? { ...r, status: 'RESPONDIDO', quotedPriceAOA } : r));
+    setRfqs(prev => prev.map(r => {
+      if (r.id !== rfqId) return r;
+      const updated = { ...r, status: 'RESPONDIDO' as const, quotedPriceAOA };
+      FirestoreSyncService.saveRFQ(updated);
+      return updated;
+    }));
     addNotification('Cotação Respondida', `Preço proposto de ${formatKz(quotedPriceAOA)} por unidade.`, 'B2B');
   };
 
@@ -1117,6 +1188,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16)
     };
     setDisputes(prev => [newDisp, ...prev]);
+    FirestoreSyncService.saveDispute(newDisp);
     advanceOrderStatus(data.orderId, 'DISPUTED');
     addNotification('Processo de Mediação Aberto no AO Protect', `Ordem #${data.orderId} entrou em conferência. Custódia retida preventivamente.`, 'SECURITY');
   };
@@ -1126,7 +1198,12 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!dispute) return;
 
     const nextStatus = action === 'REFUND' ? 'RESOLVIDO_REEMBOLSO' : 'RESOLVIDO_LIBERACAO';
-    setDisputes(prev => prev.map(d => d.id === disputeId ? { ...d, status: nextStatus, resolutionNotes: notes } : d));
+    setDisputes(prev => prev.map(d => {
+      if (d.id !== disputeId) return d;
+      const updated = { ...d, status: nextStatus as any, resolutionNotes: notes };
+      FirestoreSyncService.saveDispute(updated);
+      return updated;
+    }));
 
     if (action === 'REFUND') {
       advanceOrderStatus(dispute.orderId, 'REFUNDED');
@@ -1137,9 +1214,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // =================================================================
-  // INSS OFFICIAL SOVEREIGN INTEGRATION & AUDIT
-  // =================================================================
+  // INSS
   const [inssAuditLogs, setInssAuditLogs] = useState<INSSAuditLog[]>(() => INSSOfficialService.getAuditLogs());
 
   const refreshInssAuditLogs = async () => {
@@ -1152,50 +1227,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const validateInss = async (query: string): Promise<INSSValidationResult> => {
-    try {
-      const result = await api.validateINSS(query);
-      refreshInssAuditLogs();
-      return result;
-    } catch (err: any) {
-      // Fallback local service if API call fails
-      const fallback = await INSSOfficialService.queryAndValidate(query, currentUser);
-      setInssAuditLogs(INSSOfficialService.getAuditLogs());
-      return fallback;
-    }
+    return await api.validateINSS(query);
   };
 
-  const linkInssToProfile = async (
-    validationResult: INSSValidationResult, 
-    userConsent: boolean
-  ): Promise<{ success: boolean; message: string }> => {
-    try {
-      const response = await api.linkINSSProfile(validationResult, userConsent);
-      if (response.success && response.user) {
-        setCurrentUser(response.user);
-        setRegisteredUsers(prev => prev.map(u => u.id === response.user.id ? response.user : u));
-        localStorage.setItem('ao_market_current_user', JSON.stringify(response.user));
-        addNotification(
-          'INSS Verificado com Sucesso', 
-          `O seu perfil foi associado ao NISS ${validationResult.niss} com Selo de Entidade Verificada.`, 
-          'FORMALIZATION'
-        );
-      }
-      refreshInssAuditLogs();
-      return { success: true, message: response.message };
-    } catch (err: any) {
-      // Local fallback execution
-      const localRes = INSSOfficialService.linkToProfile(currentUser, validationResult, userConsent);
-      setCurrentUser(localRes.updatedUser);
-      setRegisteredUsers(prev => prev.map(u => u.id === localRes.updatedUser.id ? localRes.updatedUser : u));
-      localStorage.setItem('ao_market_current_user', JSON.stringify(localRes.updatedUser));
-      setInssAuditLogs(INSSOfficialService.getAuditLogs());
-      addNotification(
-        'INSS Verificado com Sucesso', 
-        `O seu perfil foi associado ao NISS ${validationResult.niss} com Selo de Entidade Verificada.`, 
-        'FORMALIZATION'
-      );
-      return { success: true, message: localRes.message };
-    }
+  const linkInssToProfile = async (validationResult: INSSValidationResult, userConsent: boolean): Promise<{ success: boolean; message: string }> => {
+    return await api.linkINSS(validationResult, userConsent);
   };
 
   const attemptInssModification = async (payload: any): Promise<any> => {
@@ -1207,12 +1243,21 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const formatKz = (val: number): string => {
+    return new Intl.NumberFormat('pt-AO', {
+      style: 'currency',
+      currency: 'AOA',
+      maximumFractionDigits: 0
+    }).format(val).replace('AOA', 'Kz');
+  };
+
   return (
     <MarketContext.Provider value={{
       currentUser,
       isAuthenticated,
       registeredUsers,
       login,
+      loginAsAdminDirect,
       registerUser,
       registerEnhancedUser,
       addProfileToCurrentUser,

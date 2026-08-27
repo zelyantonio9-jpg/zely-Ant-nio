@@ -1,28 +1,33 @@
 import React, { useState } from 'react';
 import { 
-  ShoppingBag, 
-  MapPin, 
   Search, 
-  MessageSquare, 
+  ShoppingBag, 
   User, 
-  Menu, 
-  Truck, 
-  Sprout, 
-  Store, 
-  ChevronDown,
-  ShieldCheck, 
+  MessageSquare, 
+  ChevronDown, 
+  MapPin, 
   FileDown, 
   FileText,
-  LogOut,
-  CheckCircle2,
+  ShieldCheck,
   Building2,
-  ShieldAlert
+  Truck,
+  Sprout,
+  Store,
+  LogOut,
+  Sparkles,
+  Home,
+  LayoutGrid,
+  Tag,
+  ShieldAlert,
+  Menu,
+  X,
+  ShoppingCart
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import { ANGOLA_PROVINCES } from '../data/angolaGeoData';
-import { generateOfficialPdf } from '../utils/generatePdfDoc';
-import { getRoleNamePt, isTabAllowedForRole } from '../utils/rolePermissions';
 import { Logo } from './Logo';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface HeaderProps {
   onOpenCart: () => void;
@@ -32,8 +37,9 @@ interface HeaderProps {
   onOpenDocCenter?: () => void;
   onOpenTeamManagement?: () => void;
   onOpenSecurityAuditor?: () => void;
+  onOpenAdminSecretModal?: () => void;
   searchQuery: string;
-  setSearchQuery: (query: string) => void;
+  setSearchQuery: (q: string) => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
@@ -46,6 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDocCenter,
   onOpenTeamManagement,
   onOpenSecurityAuditor,
+  onOpenAdminSecretModal,
   searchQuery,
   setSearchQuery,
   activeTab,
@@ -53,19 +60,70 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { 
     currentUser, 
-    isAuthenticated,
-    logout,
     cart, 
-    selectedProvince, 
-    setSelectedProvince, 
     notifications, 
-    markNotificationAsRead 
+    markNotificationAsRead, 
+    logout, 
+    isAuthenticated,
+    selectedProvince,
+    setSelectedProvince,
+    formatKz
   } = useMarket();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const unreadCount = notifications.filter(n => !n.read).length;
-  const totalCartCount = cart.reduce((acc, i) => acc + i.quantity, 0);
+  const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+
+  const getRoleNamePt = (role: string) => {
+    switch (role) {
+      case 'producer': return 'Produtor / Cooperativa';
+      case 'merchant': return 'Comerciante Grossista';
+      case 'driver': return 'Transportador Rodoviário';
+      case 'buyer': return 'Comprador Final';
+      case 'admin': return 'Supervisão Soberana';
+      case 'support': return 'Mesa de Apoio';
+      case 'company_admin': return 'Diretor de Empresa';
+      case 'company_user': return 'Equipa da Empresa';
+      default: return 'Cidadão';
+    }
+  };
+
+  const generateOfficialPdf = () => {
+    const doc = new jsPDF();
+    doc.setFillColor(10, 37, 64); // #0A2540
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('REPÚBLICA DE ANGOLA • AO MARKET', 14, 14);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Plataforma Soberana de Comércio Eletrónico e Escoamento Agro-Industrial', 14, 22);
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Sumário Executivo e Diretrizes Operacionais', 14, 38);
+
+    autoTable(doc, {
+      startY: 44,
+      head: [['Componente', 'Especificação', 'Enquadramento Legal / Técnico']],
+      body: [
+        ['Identidade Soberana', 'AO MARKET - O Teu Mercado Online em Angola', 'Produção Nacional'],
+        ['Câmara de Custódia', 'Retenção temporária até confirmação física', 'BNA / Multicaixa Express'],
+        ['Logística & Rastreio', 'Bolsa de fretes com dupla validação PIN OTP', 'Corredores Rodoviários Nacionais'],
+        ['Proteção Social', 'Integração formal com base contributiva', 'Decreto Presidencial 227/18 • INSS/PREI'],
+        ['Cobertura Geográfica', '18 Províncias de Angola integradas', 'Polos Agrícolas & Centrais Logísticas']
+      ],
+      headStyles: { fillColor: [10, 37, 64], textColor: [255, 255, 255] },
+      styles: { fontSize: 9 }
+    });
+
+    doc.save('AO_MARKET_Documento_Oficial_2026.pdf');
+  };
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -76,110 +134,127 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header id="main-header" className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-      {/* 1. Main Top Header Row */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
-        <div className="flex items-center justify-between gap-4 lg:gap-8">
+      {/* 1. Main Navigation Bar */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="flex items-center justify-between gap-3 lg:gap-6">
           
-          {/* Official Logo: AO MARKET */}
+          {/* Official Logo: AO MARKET with 5-clicks Admin Trigger */}
           <Logo 
-            onClick={() => setActiveTab('home')} 
+            onClick={() => setActiveTab('home')}
+            onSecretAdminTrigger={onOpenAdminSecretModal}
             size="md" 
             variant="header" 
           />
 
-          {/* Integrated Search Bar with Province Selector & Search Button */}
+          {/* Integrated Search Bar: AOA / Pesquisar produtos... */}
           <form 
             onSubmit={handleSearchSubmit}
-            className="flex-1 max-w-2xl hidden md:flex items-center bg-slate-50 hover:bg-white focus-within:bg-white border border-slate-200 focus-within:border-slate-400 rounded-xl transition overflow-hidden pl-3.5 pr-1.5 py-1"
+            className="flex-1 max-w-xl hidden md:flex items-center bg-slate-50 hover:bg-white focus-within:bg-white border border-slate-200 focus-within:border-[#FF6B00] rounded-full transition overflow-hidden pl-4 pr-1.5 py-1 shadow-2xs"
           >
-            <Search className="w-4 h-4 text-slate-400 shrink-0 mr-2.5" />
+            <Search className="w-4 h-4 text-slate-400 shrink-0 mr-2" />
             <input
               id="search-input-header"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Pesquisar produtos, serviços e fornecedores..."
+              placeholder="AOA / Pesquisar produtos, categorias, produtores..."
               className="w-full bg-transparent text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-hidden py-1.5"
             />
 
-            {/* Integrated Province Dropdown */}
-            <div className="h-6 w-px bg-slate-200 mx-2 shrink-0"></div>
-            <div className="relative shrink-0 flex items-center pr-2">
-              <select
-                id="header-province-select"
-                value={selectedProvince}
-                onChange={(e) => setSelectedProvince(e.target.value)}
-                className="bg-transparent text-xs text-slate-700 font-medium focus:outline-hidden appearance-none cursor-pointer pr-4"
-              >
-                <option value="todas">Todas as Províncias</option>
-                {ANGOLA_PROVINCES.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-0 pointer-events-none" />
+            {/* Quick Currency indicator */}
+            <div className="px-2 py-0.5 mr-2 rounded-md bg-slate-200/70 text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+              AOA
             </div>
 
-            {/* Dark Search Button */}
             <button
               type="submit"
-              className="w-9 h-9 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-lg flex items-center justify-center transition shrink-0 ml-1 cursor-pointer"
-              title="Executar pesquisa"
+              className="px-4 py-1.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white font-bold text-xs rounded-full transition shrink-0 cursor-pointer shadow-xs"
             >
-              <Search className="w-4 h-4 text-amber-400" />
+              Buscar
             </button>
           </form>
 
-          {/* Right Action Icons: Mensagens, Carrinho, Perfil/Entrar */}
-          <div className="flex items-center space-x-4 sm:space-x-6 shrink-0">
+          {/* Right Action Icons: Province Filter, Cart, Notifications, Login/User Profile */}
+          <div className="flex items-center space-x-2 sm:space-x-3">
             
-            {/* Mensagens / Notificações (with Gold Badge '2') */}
+            {/* Province Selector Dropdown */}
+            <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100/90 border border-slate-200 rounded-full text-xs font-semibold text-slate-700">
+              <MapPin className="w-3.5 h-3.5 text-[#FF6B00] shrink-0" />
+              <select
+                id="header-province-filter"
+                value={selectedProvince}
+                onChange={(e) => setSelectedProvince(e.target.value)}
+                className="bg-transparent border-none text-xs font-semibold text-slate-800 focus:outline-hidden cursor-pointer"
+              >
+                <option value="todas">Angola (18 Províncias)</option>
+                {ANGOLA_PROVINCES.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Cart Icon & Counter */}
+            <button
+              id="header-cart-btn"
+              onClick={onOpenCart}
+              className="relative p-2 text-slate-700 hover:text-[#FF6B00] hover:bg-orange-50 rounded-full transition cursor-pointer"
+              title="Carrinho de Compras"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {totalCartCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#FF6B00] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 border-2 border-white shadow-xs">
+                  {totalCartCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notifications Bell */}
             <div className="relative">
               <button
-                id="btn-toggle-notifications"
+                id="header-notif-btn"
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="flex flex-col sm:flex-row items-center sm:space-x-1.5 text-slate-700 hover:text-slate-900 transition relative cursor-pointer group"
-                title="Mensagens e Notificações"
+                className="relative p-2 text-slate-700 hover:text-[#FF6B00] hover:bg-orange-50 rounded-full transition cursor-pointer"
+                title="Notificações do Ecossistema"
               >
-                <div className="relative">
-                  <MessageSquare className="w-5 h-5 text-slate-700 group-hover:text-slate-900" />
-                  <span className="absolute -top-1.5 -right-2 bg-amber-500 text-slate-950 text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
-                    {unreadCount > 0 ? unreadCount : '2'}
+                <MessageSquare className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white">
+                    {unreadCount}
                   </span>
-                </div>
-                <span className="text-xs font-semibold hidden sm:inline text-slate-800">Mensagens</span>
+                )}
               </button>
 
-              {/* Notifications Popover */}
+              {/* Notification Popup Dropdown */}
               {showNotifications && (
-                <div 
-                  id="notifications-popover" 
-                  className="absolute right-0 mt-3 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-xl p-3.5 z-50 text-slate-800"
-                >
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
-                    <span className="font-bold text-xs text-slate-900">Mensagens & Notificações</span>
-                    <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-md">
-                      {notifications.length} ativas
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 py-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+                    <span className="font-extrabold text-xs text-slate-900">
+                      Notificações do Sistema ({notifications.length})
                     </span>
+                    {unreadCount > 0 && (
+                      <span className="text-[10px] bg-orange-100 text-orange-800 font-bold px-2 py-0.5 rounded-full">
+                        {unreadCount} novas
+                      </span>
+                    )}
                   </div>
-                  <div className="max-h-64 overflow-y-auto space-y-2">
+
+                  <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
                     {notifications.length === 0 ? (
-                      <p className="text-xs text-slate-400 text-center py-4">Sem novas mensagens.</p>
+                      <div className="p-4 text-center text-slate-400 text-xs">
+                        Não existem notificações recentes.
+                      </div>
                     ) : (
-                      notifications.map(n => (
+                      notifications.slice(0, 5).map((n) => (
                         <div 
-                          key={n.id}
+                          key={n.id} 
                           onClick={() => markNotificationAsRead(n.id)}
-                          className={`p-2.5 rounded-xl text-xs cursor-pointer transition ${
-                            n.read ? 'bg-slate-50 text-slate-500' : 'bg-amber-50 text-slate-900 border border-amber-200'
-                          }`}
+                          className={`p-3.5 text-xs transition cursor-pointer ${n.read ? 'bg-white opacity-70' : 'bg-orange-50/50 hover:bg-orange-50 font-medium'}`}
                         >
-                          <div className="flex items-center justify-between font-semibold mb-0.5">
-                            <span className="text-amber-900 font-bold text-[11px]">{n.title}</span>
-                            <span className="text-[9px] text-slate-400">{n.timestamp}</span>
+                          <div className="flex items-center justify-between text-[11px] mb-1">
+                            <strong className="text-slate-900">{n.title}</strong>
+                            <span className="text-[10px] text-slate-400">{n.timestamp}</span>
                           </div>
-                          <p className="text-[11px] text-slate-600 line-clamp-2">{n.message}</p>
+                          <p className="text-slate-600 text-[11px] leading-relaxed">{n.message}</p>
                         </div>
                       ))
                     )}
@@ -188,297 +263,204 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* Carrinho */}
-            <button
-              id="btn-open-cart-header"
-              onClick={onOpenCart}
-              className="flex flex-col sm:flex-row items-center sm:space-x-1.5 text-slate-700 hover:text-slate-900 transition cursor-pointer group"
-              title="Abrir Carrinho de Compras"
-            >
-              <div className="relative">
-                <ShoppingBag className="w-5 h-5 text-slate-700 group-hover:text-slate-900" />
-                {totalCartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-amber-500 text-slate-950 font-extrabold text-[10px] w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
-                    {totalCartCount}
-                  </span>
-                )}
-              </div>
-              <span className="text-xs font-semibold hidden sm:inline text-slate-800">Carrinho</span>
-            </button>
-
-            {/* Perfil / Entrar */}
+            {/* User Profile / Login Gateway */}
             {isAuthenticated ? (
               <div className="relative">
                 <button
-                  id="btn-user-profile-menu"
+                  id="header-user-menu-btn"
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-1.5 text-slate-800 hover:text-slate-950 transition cursor-pointer font-semibold text-xs"
+                  className="flex items-center space-x-2 pl-2 pr-3 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-full transition cursor-pointer"
                 >
-                  <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-300 text-slate-800 flex items-center justify-center text-xs font-bold">
-                    {currentUser.name.slice(0, 1).toUpperCase()}
+                  <div className="w-7 h-7 rounded-full bg-[#0A2540] text-white flex items-center justify-center text-xs font-bold shadow-2xs">
+                    {currentUser.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="hidden sm:inline">{currentUser.name.split(' ')[0]}</span>
+                  <div className="hidden sm:flex flex-col text-left leading-none">
+                    <span className="text-xs font-bold text-slate-900 truncate max-w-[110px]">
+                      {currentUser.name.split(' ')[0]}
+                    </span>
+                    <span className="text-[10px] text-[#FF6B00] font-semibold">
+                      {getRoleNamePt(currentUser.role)}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
                 </button>
 
+                {/* Dropdown User Menu */}
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 text-xs text-slate-800">
-                    <div className="p-2.5 border-b border-slate-100 mb-1">
-                      <div className="font-bold text-slate-900 truncate">{currentUser.name}</div>
-                      <div className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-md inline-block mt-0.5">
-                        {getRoleNamePt(currentUser.role)}
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-xs">
+                    <div className="px-4 py-2 border-b border-slate-100">
+                      <p className="font-extrabold text-slate-900 text-sm truncate">{currentUser.name}</p>
+                      <p className="text-[11px] text-slate-500">{currentUser.phone || currentUser.email}</p>
+                      <div className="mt-1 flex items-center space-x-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md w-fit">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                        <span>Nível {currentUser.verificationLevel} • {currentUser.badge || 'Certificado'}</span>
                       </div>
                     </div>
 
-                    {currentUser.role === 'producer' && (
+                    <div className="py-1">
+                      {onOpenDocCenter && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); onOpenDocCenter(); }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center space-x-2 cursor-pointer"
+                        >
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          <span>Centro de Documentos</span>
+                        </button>
+                      )}
+
+                      {onOpenTeamManagement && currentUser.entityType === 'EMPRESA' && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); onOpenTeamManagement(); }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center space-x-2 cursor-pointer"
+                        >
+                          <Building2 className="w-4 h-4 text-indigo-600" />
+                          <span>Gestão de Equipa Empresarial</span>
+                        </button>
+                      )}
+
+                      {onOpenSecurityAuditor && currentUser.role === 'admin' && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); onOpenSecurityAuditor(); }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center space-x-2 cursor-pointer"
+                        >
+                          <ShieldAlert className="w-4 h-4 text-red-600" />
+                          <span>Auditoria de Segurança</span>
+                        </button>
+                      )}
+
                       <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          setActiveTab('producer');
-                        }}
-                        className="w-full text-left p-2 rounded-xl hover:bg-slate-50 text-slate-700 flex items-center space-x-2 transition cursor-pointer"
+                        onClick={generateOfficialPdf}
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center space-x-2 cursor-pointer"
                       >
-                        <Sprout className="w-4 h-4 text-emerald-600" />
-                        <span>Painel do Produtor</span>
+                        <FileDown className="w-4 h-4 text-[#FF6B00]" />
+                        <span>Descarregar Certificado Oficial</span>
                       </button>
-                    )}
+                    </div>
 
-                    {currentUser.role === 'merchant' && (
+                    <div className="pt-1 border-t border-slate-100">
                       <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          setActiveTab('merchant');
-                        }}
-                        className="w-full text-left p-2 rounded-xl hover:bg-slate-50 text-slate-700 flex items-center space-x-2 transition cursor-pointer"
+                        onClick={() => { setShowUserMenu(false); logout(); }}
+                        className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 font-bold flex items-center space-x-2 cursor-pointer"
                       >
-                        <Store className="w-4 h-4 text-amber-600" />
-                        <span>Painel do Comerciante (RFQ)</span>
+                        <LogOut className="w-4 h-4" />
+                        <span>Encerrar Sessão</span>
                       </button>
-                    )}
-
-                    {currentUser.role === 'driver' && (
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          setActiveTab('logistics');
-                        }}
-                        className="w-full text-left p-2 rounded-xl hover:bg-slate-50 text-slate-700 flex items-center space-x-2 transition cursor-pointer"
-                      >
-                        <Truck className="w-4 h-4 text-blue-600" />
-                        <span>Bolsa de Cargas (AO Logistics)</span>
-                      </button>
-                    )}
-
-                    {currentUser.role === 'buyer' && (
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          setActiveTab('marketplace');
-                        }}
-                        className="w-full text-left p-2 rounded-xl hover:bg-slate-50 text-slate-700 flex items-center space-x-2 transition cursor-pointer"
-                      >
-                        <ShoppingBag className="w-4 h-4 text-purple-600" />
-                        <span>Catálogo & Encomendas</span>
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        setActiveTab('social_protection');
-                      }}
-                      className="w-full text-left p-2 rounded-xl hover:bg-slate-50 text-slate-700 flex items-center space-x-2 transition cursor-pointer"
-                    >
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      <span>INSS & Benefícios</span>
-                    </button>
-
-                    {onOpenDocCenter && (
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          onOpenDocCenter();
-                        }}
-                        className="w-full text-left p-2 rounded-xl hover:bg-slate-50 text-slate-700 flex items-center space-x-2 transition cursor-pointer"
-                      >
-                        <FileText className="w-4 h-4 text-amber-600" />
-                        <span>Documentos & Verificação</span>
-                      </button>
-                    )}
-
-                    {(currentUser.entityType === 'EMPRESA' || currentUser.activeProfiles?.includes('EMPRESA') || (currentUser.companyTeamMembers && currentUser.companyTeamMembers.length > 0)) && onOpenTeamManagement && (
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          onOpenTeamManagement();
-                        }}
-                        className="w-full text-left p-2 rounded-xl hover:bg-slate-50 text-slate-700 flex items-center space-x-2 transition cursor-pointer"
-                      >
-                        <Building2 className="w-4 h-4 text-purple-600" />
-                        <span>Equipa & RBAC</span>
-                      </button>
-                    )}
-
-                    {onOpenSecurityAuditor && currentUser.role === 'admin' && (
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          onOpenSecurityAuditor();
-                        }}
-                        className="w-full text-left p-2 rounded-xl hover:bg-amber-50 text-amber-800 flex items-center space-x-2 transition cursor-pointer font-bold"
-                      >
-                        <ShieldAlert className="w-4 h-4 text-amber-600" />
-                        <span>Auditoria & Testes RBAC</span>
-                      </button>
-                    )}
-
-                    <div className="border-t border-slate-100 my-1"></div>
-
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        logout();
-                      }}
-                      className="w-full text-left p-2 rounded-xl hover:bg-red-50 text-red-600 flex items-center space-x-2 transition cursor-pointer font-semibold"
-                    >
-                      <LogOut className="w-4 h-4 text-red-600" />
-                      <span>Sair da Conta</span>
-                    </button>
+                    </div>
                   </div>
                 )}
               </div>
             ) : (
-              <button
-                id="btn-header-login"
-                onClick={() => onOpenAuth('LOGIN')}
-                className="flex flex-col sm:flex-row items-center sm:space-x-1.5 text-slate-700 hover:text-slate-900 transition cursor-pointer"
-              >
-                <User className="w-5 h-5 text-slate-700" />
-                <span className="text-xs font-semibold hidden sm:inline text-slate-800">Perfil/Entrar</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  id="header-login-btn"
+                  onClick={() => onOpenAuth('LOGIN')}
+                  className="px-3.5 py-1.5 text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] transition cursor-pointer"
+                >
+                  Entrar
+                </button>
+                <button
+                  id="header-register-btn"
+                  onClick={() => onOpenAuth('REGISTER')}
+                  className="px-4 py-1.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white text-xs font-bold rounded-full transition shadow-xs cursor-pointer"
+                >
+                  Registar
+                </button>
+              </div>
             )}
+
+            {/* Mobile Hamburger Toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 md:hidden text-slate-700 hover:text-slate-900 rounded-lg"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+
           </div>
         </div>
 
-        {/* Mobile Search input */}
-        <div className="mt-3 md:hidden">
-          <form onSubmit={handleSearchSubmit} className="relative flex items-center">
-            <input
-              id="search-input-mobile"
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Pesquisar produtos, serviços e fornecedores..."
-              className="w-full pl-9 pr-10 py-2 bg-slate-50 text-slate-900 placeholder-slate-400 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:bg-white focus:border-slate-400"
-            />
-            <Search className="w-4 h-4 text-slate-400 absolute left-3" />
-            <button
-              type="submit"
-              className="w-7 h-7 bg-slate-900 text-amber-400 rounded-lg flex items-center justify-center absolute right-1.5"
-            >
-              <Search className="w-3.5 h-3.5" />
-            </button>
-          </form>
-        </div>
+        {/* Mobile Search Bar if viewport is small */}
+        <form 
+          onSubmit={handleSearchSubmit}
+          className="mt-2.5 flex md:hidden items-center bg-slate-100 border border-slate-200 rounded-full px-3 py-1"
+        >
+          <Search className="w-4 h-4 text-slate-400 shrink-0 mr-2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="AOA / Pesquisar produtos em Angola..."
+            className="w-full bg-transparent text-xs text-slate-900 focus:outline-hidden py-1"
+          />
+          <button type="submit" className="text-xs font-bold text-[#FF6B00]">Buscar</button>
+        </form>
       </div>
 
-      {/* 2. Sub-navigation Bar: Adapted to Authorized Profile */}
-      <div className="border-t border-slate-100 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between text-xs text-slate-700">
-          <div className="flex items-center space-x-6 sm:space-x-8 overflow-x-auto no-scrollbar py-0.5">
-            {(!isAuthenticated || currentUser.role === 'admin' || currentUser.role === 'buyer' || currentUser.role === 'merchant' || currentUser.role === 'producer') && (
-              <button
-                onClick={() => setActiveTab('marketplace')}
-                className={`flex items-center space-x-1.5 font-semibold transition cursor-pointer hover:text-slate-900 whitespace-nowrap ${
-                  activeTab === 'marketplace' ? 'text-amber-600 font-bold' : 'text-slate-700'
-                }`}
-              >
-                <Menu className="w-4 h-4 text-slate-700" />
-                <span>Catálogo Nacional (Produtos)</span>
-              </button>
-            )}
+      {/* 2. Secondary Quick Bar: Top Market Categories & Navigation Links */}
+      <div className="bg-[#0A2540] text-white text-xs font-semibold px-4 py-2 border-t border-slate-800">
+        <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto gap-4 scrollbar-none">
+          <div className="flex items-center space-x-4 sm:space-x-6 shrink-0">
+            <button
+              onClick={() => setActiveTab('home')}
+              className={`flex items-center space-x-1.5 py-0.5 px-2.5 rounded-full transition cursor-pointer ${activeTab === 'home' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>Início</span>
+            </button>
 
-            {(!isAuthenticated || currentUser.role === 'admin' || currentUser.role === 'producer') && (
-              <button
-                onClick={() => setActiveTab('producer')}
-                className={`flex items-center space-x-1.5 font-semibold transition cursor-pointer hover:text-slate-900 whitespace-nowrap ${
-                  activeTab === 'producer' ? 'text-amber-600 font-bold' : 'text-slate-700'
-                }`}
-              >
-                <Sprout className="w-4 h-4 text-emerald-600" />
-                <span>{isAuthenticated ? 'Meu Painel de Produtor' : 'Área do Produtor'}</span>
-              </button>
-            )}
+            <button
+              onClick={() => setActiveTab('marketplace')}
+              className={`flex items-center space-x-1.5 py-0.5 px-2.5 rounded-full transition cursor-pointer ${activeTab === 'marketplace' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>Mercado Nacional</span>
+            </button>
 
-            {(!isAuthenticated || currentUser.role === 'admin' || currentUser.role === 'merchant') && (
-              <button
-                onClick={() => setActiveTab('merchant')}
-                className={`flex items-center space-x-1.5 font-semibold transition cursor-pointer hover:text-slate-900 whitespace-nowrap ${
-                  activeTab === 'merchant' ? 'text-amber-600 font-bold' : 'text-slate-700'
-                }`}
-              >
-                <Store className="w-4 h-4 text-amber-600" />
-                <span>{isAuthenticated ? 'Cotações & Compras B2B (RFQ)' : 'Grossista & Comerciante (RFQ)'}</span>
-              </button>
-            )}
+            <button
+              onClick={() => setActiveTab('producer')}
+              className={`flex items-center space-x-1.5 py-0.5 px-2.5 rounded-full transition cursor-pointer ${activeTab === 'producer' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
+            >
+              <Sprout className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Produtores</span>
+            </button>
 
-            {(!isAuthenticated || currentUser.role === 'admin' || currentUser.role === 'driver') && (
-              <button
-                onClick={() => setActiveTab('logistics')}
-                className={`flex items-center space-x-1.5 font-semibold transition cursor-pointer hover:text-slate-900 whitespace-nowrap ${
-                  activeTab === 'logistics' ? 'text-amber-600 font-bold' : 'text-slate-700'
-                }`}
-              >
-                <Truck className="w-4 h-4 text-blue-600" />
-                <span>{isAuthenticated ? 'Minha Bolsa de Fretes (Logística)' : 'Soluções Logísticas (Transporte)'}</span>
-              </button>
-            )}
+            <button
+              onClick={() => setActiveTab('merchant')}
+              className={`flex items-center space-x-1.5 py-0.5 px-2.5 rounded-full transition cursor-pointer ${activeTab === 'merchant' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
+            >
+              <Store className="w-3.5 h-3.5 text-amber-400" />
+              <span>Comerciantes B2B</span>
+            </button>
 
-            {isAuthenticated && (currentUser.role === 'producer' || currentUser.role === 'driver') && (
-              <button
-                onClick={() => setActiveTab('social_protection')}
-                className={`flex items-center space-x-1.5 font-semibold transition cursor-pointer hover:text-slate-900 whitespace-nowrap ${
-                  activeTab === 'social_protection' ? 'text-amber-600 font-bold' : 'text-slate-700'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>INSS & Benefícios</span>
-              </button>
-            )}
+            <button
+              onClick={() => setActiveTab('logistics')}
+              className={`flex items-center space-x-1.5 py-0.5 px-2.5 rounded-full transition cursor-pointer ${activeTab === 'logistics' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
+            >
+              <Truck className="w-3.5 h-3.5 text-blue-400" />
+              <span>AO Logistics</span>
+            </button>
           </div>
 
-          {/* Quick PDF & Spec & RBAC shortcut */}
-          <div className="hidden lg:flex items-center space-x-3">
-            {onOpenSecurityAuditor && currentUser.role === 'admin' && (
-              <>
-                <button
-                  onClick={onOpenSecurityAuditor}
-                  className="text-[11px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 flex items-center space-x-1 cursor-pointer"
-                >
-                  <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Auditoria RBAC</span>
-                </button>
-                <span className="text-slate-200">|</span>
-              </>
-            )}
+          <div className="flex items-center space-x-3 shrink-0">
             <button
-              onClick={generateOfficialPdf}
-              className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 flex items-center space-x-1 cursor-pointer"
+              onClick={onOpenAssistant}
+              className="flex items-center space-x-1.5 px-2.5 py-0.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full font-bold shadow-xs hover:opacity-90 transition cursor-pointer"
             >
-              <FileDown className="w-3.5 h-3.5 text-amber-600" />
-              <span>Documentação Oficial (PDF)</span>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Assistente Soberano IA</span>
+              <span className="sm:hidden">IA</span>
             </button>
-            <span className="text-slate-200">|</span>
+
             <button
               onClick={onOpenArchitecture}
-              className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 flex items-center space-x-1 cursor-pointer"
+              className="text-slate-300 hover:text-white text-[11px] underline underline-offset-2 transition cursor-pointer"
             >
-              <FileText className="w-3.5 h-3.5 text-slate-600" />
-              <span>Especificação</span>
+              Especificação Técnica
             </button>
           </div>
         </div>
       </div>
+
     </header>
   );
 };
-

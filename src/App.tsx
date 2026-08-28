@@ -383,7 +383,7 @@ const MainAppContent: React.FC = () => {
                 Cobertura Territorial
               </span>
               <p className="text-[#94a3b8] text-xs">
-                Operação ativa em 18 províncias e 164 municípios com rotas rodoviárias integradas.
+                Operação ativa em 21 províncias e 326 municípios com rotas rodoviárias integradas (DPA).
               </p>
               <div className="p-3 bg-[#050914] rounded-xl border border-[#1e293b] space-y-1">
                 <div className="text-[11px] text-white font-semibold flex items-center justify-between">

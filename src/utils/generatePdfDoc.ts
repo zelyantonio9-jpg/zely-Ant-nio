@@ -89,7 +89,7 @@ export const generateOfficialPdf = (): void => {
   doc.setFont('helvetica', 'bold');
   doc.text('Âmbito Geográfico:', margin + 4, y + 13);
   doc.setFont('helvetica', 'normal');
-  doc.text('18 Províncias e 164 Municípios de Angola', margin + 35, y + 13);
+  doc.text('21 Províncias e 326 Municípios de Angola (DPA)', margin + 35, y + 13);
 
   y += 26;
 

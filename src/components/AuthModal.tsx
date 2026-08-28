@@ -297,7 +297,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       </div>
                       <div>
                         <strong className="block text-white font-bold">Rede Logística</strong>
-                        <span className="text-slate-400 text-[11px]">Bolsa de fretes interligada nas 18 províncias.</span>
+                        <span className="text-slate-400 text-[11px]">Bolsa de fretes interligada nas 21 províncias (326 municípios).</span>
                       </div>
                     </div>
 
@@ -341,7 +341,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </p>
                 <div className="flex items-center space-x-2 pt-1 text-[10px] text-slate-400">
                   <Globe className="w-3 h-3 text-emerald-400" />
-                  <span>Cobertura nas 18 Províncias de Angola</span>
+                  <span>Cobertura nas 21 Províncias e 326 Municípios de Angola</span>
                 </div>
               </div>
             </div>

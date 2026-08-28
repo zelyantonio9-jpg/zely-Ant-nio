@@ -219,7 +219,7 @@ export const ArchitectureDocModal: React.FC<ArchitectureDocModalProps> = ({ isOp
               <h3 className="text-xs font-bold text-slate-900">Roadmap Estratégico de Evolução</h3>
               <div className="space-y-2 text-[11px]">
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <strong className="text-slate-900">Fase 1 (MVP Construído):</strong> <span className="text-slate-600">Marketplace multirrole, 18 províncias, AO Logistics com frete e OTP, AO PAY com custódia, AO Protect disputas, Simulador INSS e AO Assist.</span>
+                  <strong className="text-slate-900">Fase 1 (MVP Construído):</strong> <span className="text-slate-600">Marketplace multirrole, 21 províncias e 326 municípios (DPA), AO Logistics com frete e OTP, AO PAY com custódia, AO Protect disputas, Simulador INSS e AO Assist.</span>
                 </div>
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <strong className="text-slate-900">Fase 2 (Integrações Bancárias Oficiais):</strong> <span className="text-slate-600">Conexão API direta com a EMIS (Multicaixa GPO) e webservices de consulta de regularidade contributiva do INSS.</span>

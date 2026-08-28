@@ -119,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
         ['Câmara de Custódia', 'Retenção temporária até confirmação física', 'BNA / Multicaixa Express'],
         ['Logística & Rastreio', 'Bolsa de fretes com dupla validação PIN OTP', 'Corredores Rodoviários Nacionais'],
         ['Proteção Social', 'Integração formal com base contributiva', 'Decreto Presidencial 227/18 • INSS/PREI'],
-        ['Cobertura Geográfica', '18 Províncias de Angola integradas', 'Polos Agrícolas & Centrais Logísticas']
+        ['Cobertura Geográfica', '21 Províncias e 326 Municípios de Angola (DPA)', 'Polos Agrícolas & Centrais Logísticas']
       ],
       headStyles: { fillColor: [10, 37, 64], textColor: [255, 255, 255] },
       styles: { fontSize: 9 }
@@ -511,7 +511,7 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none"
               >
-                <option value="todas">Angola (Todas as 18 Províncias)</option>
+                <option value="todas">Angola (Todas as 21 Províncias / 326 Municípios)</option>
                 {ANGOLA_PROVINCES.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}

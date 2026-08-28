@@ -59,7 +59,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       } else if (q.includes('descrever') || q.includes('lote') || q.includes('colheita')) {
         reply = `Aqui está um modelo de descrição técnica recomendada para lotes no AO MARKET:\n\n*"Lote agrícola de produção nacional colhido na época corrente. Especificação de grau e humidade controlados, acondicionado em sacaria apropriada, pronto para expedição com rastreio rodoviário e documentação de transporte oficial."*`;
       } else {
-        reply = `O ecossistema AO MARKET conecta diretamente a produção agrícola, comércio grossista e transportadoras nas 18 províncias de Angola com base de dados centralizada no Firebase.\n\nComo posso ser útil na sua operação?`;
+        reply = `O ecossistema AO MARKET conecta diretamente a produção agrícola, comércio grossista e transportadoras nas 21 províncias e 326 municípios de Angola com base de dados centralizada no Firebase.\n\nComo posso ser útil na sua operação?`;
       }
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);

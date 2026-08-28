@@ -143,7 +143,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 onChange={(e) => setSelectedProvince(e.target.value)}
                 className="bg-white border border-slate-300 text-slate-900 text-xs font-semibold rounded-lg px-2.5 py-1 focus:outline-none focus:border-slate-500 cursor-pointer"
               >
-                <option value="todas">Todas as 18 Províncias</option>
+                <option value="todas">Todas as 21 Províncias</option>
                 {ANGOLA_PROVINCES.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -184,7 +184,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               <Filter className="w-8 h-8 text-slate-400 mx-auto" />
               <h3 className="text-sm font-bold text-slate-900">Nenhum produto encontrado para estes filtros</h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Tente selecionar "Todas as 18 Províncias" ou escolher outra categoria.
+                Tente selecionar "Todas as 21 Províncias" ou escolher outra categoria.
               </p>
               <button
                 onClick={() => {

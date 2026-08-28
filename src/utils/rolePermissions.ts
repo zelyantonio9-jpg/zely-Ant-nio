@@ -33,7 +33,7 @@ export const ECOSYSTEM_TABS: Record<TabId, TabConfig> = {
     id: 'marketplace',
     label: 'Catálogo Nacional',
     shortLabel: 'Catálogo',
-    description: 'Exploração e compras de produtos das 18 províncias',
+    description: 'Exploração e compras de produtos das 21 províncias (326 municípios)',
     allowedRoles: ['buyer', 'producer', 'merchant', 'admin', 'support'],
     requiresAuth: false
   },

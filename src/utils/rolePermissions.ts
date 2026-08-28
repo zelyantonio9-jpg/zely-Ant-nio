@@ -83,12 +83,12 @@ export const ECOSYSTEM_TABS: Record<TabId, TabConfig> = {
   },
   admin: {
     id: 'admin',
-    label: 'Supervisão Nacional',
+    label: 'Painel Administrativo',
     shortLabel: 'Painel Admin',
-    description: 'Auditoria de transações, validação documental e monitorização do ecossistema',
+    description: 'Gestão de transações, validação documental e monitorização do ecossistema',
     allowedRoles: ['admin', 'support'],
     requiresAuth: true,
-    roleSpecificNotice: 'Acesso restrito à Direção de Supervisão e Administração do AO MARKET.'
+    roleSpecificNotice: 'Acesso restrito à equipa de administração do AO MARKET.'
   }
 };
 

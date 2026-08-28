@@ -86,8 +86,8 @@ export const Header: React.FC<HeaderProps> = ({
       case 'merchant': return 'Comerciante Grossista';
       case 'driver': return 'Transportador Rodoviário';
       case 'buyer': return 'Comprador Final';
-      case 'admin': return 'Supervisão Soberana';
-      case 'support': return 'Mesa de Apoio';
+      case 'admin': return 'Administração';
+      case 'support': return 'Suporte & Apoio';
       case 'company_admin': return 'Diretor de Empresa';
       case 'company_user': return 'Equipa da Empresa';
       default: return 'Cidadão';
@@ -371,83 +371,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* 2. Secondary Quick Bar: Top Market Categories & Navigation Links */}
-      <div className="bg-[#0A2540] text-white text-xs font-semibold px-4 py-2 border-t border-slate-800">
-        <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto gap-4 scrollbar-none">
-          <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
-            <button
-              onClick={() => setActiveTab('home')}
-              className={`flex items-center space-x-1.5 py-1 px-3 rounded-full transition cursor-pointer whitespace-nowrap ${activeTab === 'home' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
-            >
-              <Home className="w-3.5 h-3.5" />
-              <span>Início</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('marketplace')}
-              className={`flex items-center space-x-1.5 py-1 px-3 rounded-full transition cursor-pointer whitespace-nowrap ${activeTab === 'marketplace' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
-            >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              <span>Mercado</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('producer')}
-              className={`flex items-center space-x-1.5 py-1 px-3 rounded-full transition cursor-pointer whitespace-nowrap ${activeTab === 'producer' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
-            >
-              <Sprout className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Produtores</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('merchant')}
-              className={`flex items-center space-x-1.5 py-1 px-3 rounded-full transition cursor-pointer whitespace-nowrap ${activeTab === 'merchant' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
-            >
-              <Store className="w-3.5 h-3.5 text-amber-400" />
-              <span>Comerciantes B2B</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('logistics')}
-              className={`flex items-center space-x-1.5 py-1 px-3 rounded-full transition cursor-pointer whitespace-nowrap ${activeTab === 'logistics' ? 'bg-[#FF6B00] text-white' : 'text-slate-200 hover:text-white'}`}
-            >
-              <Truck className="w-3.5 h-3.5 text-blue-400" />
-              <span>AO Logistics</span>
-            </button>
-          </div>
-
-          <div className="flex items-center space-x-2.5 shrink-0">
-            <button
-              onClick={onOpenAssistant}
-              className="flex items-center space-x-1.5 px-3 py-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full font-bold shadow-xs hover:opacity-90 transition cursor-pointer whitespace-nowrap"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Assistente Soberano IA</span>
-              <span className="sm:hidden">IA</span>
-            </button>
-
-            {onOpenRules && (
-              <button
-                onClick={onOpenRules}
-                className="flex items-center space-x-1 text-slate-300 hover:text-emerald-400 text-[11px] font-semibold transition cursor-pointer whitespace-nowrap"
-              >
-                <Scale className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline">Regras & Governação</span>
-                <span className="sm:hidden">Regras</span>
-              </button>
-            )}
-
-            <button
-              onClick={onOpenArchitecture}
-              className="text-slate-300 hover:text-white text-[11px] underline underline-offset-2 transition cursor-pointer whitespace-nowrap"
-            >
-              Doc Técnica
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Mobile Navigation Drawer when mobileMenuOpen is TRUE */}
+      {/* Mobile Navigation Drawer when mobileMenuOpen is TRUE */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 top-[108px] z-50 bg-slate-900/60 backdrop-blur-xs flex flex-col justify-start">
           <div className="bg-white border-b border-slate-200 shadow-2xl p-5 space-y-4 max-h-[80vh] overflow-y-auto animate-in slide-in-from-top-4 duration-200">

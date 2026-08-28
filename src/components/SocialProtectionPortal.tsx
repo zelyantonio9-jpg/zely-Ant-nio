@@ -32,7 +32,7 @@ export const SocialProtectionPortal: React.FC = () => {
     attemptInssModification 
   } = useMarket();
 
-  const [searchQuery, setSearchQuery] = useState(currentUser.nif || currentUser.inssNumber || '5419082341');
+  const [searchQuery, setSearchQuery] = useState(currentUser.nif || currentUser.inssNumber || '');
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<INSSValidationResult | null>(null);
   const [userConsent, setUserConsent] = useState(true);
@@ -44,8 +44,8 @@ export const SocialProtectionPortal: React.FC = () => {
   const [attemptFeedback, setAttemptFeedback] = useState<{ status: number; message: string; type: 'error' | 'success' } | null>(null);
   const [isAttemptingAlteration, setIsAttemptingAlteration] = useState(false);
 
-  // Simulator
-  const [simulatedGrossSales, setSimulatedGrossSales] = useState<number>(850000);
+  // Simulator based on real user sales or interactive input
+  const [simulatedGrossSales, setSimulatedGrossSales] = useState<number>(currentUser.totalSalesAOA || 0);
   const selectedContributionRate = currentUser.role === 'producer' ? 0.03 : 0.04;
   const calculatedINSS = Math.round(simulatedGrossSales * selectedContributionRate);
   const estimatedPensionAOA = Math.round(simulatedGrossSales * 0.45);

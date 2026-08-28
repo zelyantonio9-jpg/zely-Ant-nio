@@ -21,19 +21,19 @@ export const ProducerPortal: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<ProductCategory>('graos_cereais');
-  const [price, setPrice] = useState<number>(15000);
-  const [unit, setUnit] = useState('saco 50kg');
-  const [availableStock, setAvailableStock] = useState<number>(100);
-  const [minOrderQuantity, setMinOrderQuantity] = useState<number>(5);
-  const [originProvince, setOriginProvince] = useState(currentUser.province || 'huambo');
-  const [originMunicipality, setOriginMunicipality] = useState(currentUser.municipality || 'Bailundo');
-  const [farmOrFactoryName, setFarmOrFactoryName] = useState(currentUser.companyName || 'Fazenda Agro-Produtiva');
-  const [weightKgPerUnit, setWeightKgPerUnit] = useState<number>(50);
-  const [volumeM3PerUnit, setVolumeM3PerUnit] = useState<number>(0.08);
+  const [price, setPrice] = useState<number>(0);
+  const [unit, setUnit] = useState('Kg');
+  const [availableStock, setAvailableStock] = useState<number>(0);
+  const [minOrderQuantity, setMinOrderQuantity] = useState<number>(1);
+  const [originProvince, setOriginProvince] = useState(currentUser.province || 'luanda');
+  const [originMunicipality, setOriginMunicipality] = useState(currentUser.municipality || 'Luanda');
+  const [farmOrFactoryName, setFarmOrFactoryName] = useState(currentUser.companyName || currentUser.name || '');
+  const [weightKgPerUnit, setWeightKgPerUnit] = useState<number>(1);
+  const [volumeM3PerUnit, setVolumeM3PerUnit] = useState<number>(0.01);
   const [requiresRefrigeration, setRequiresRefrigeration] = useState(false);
   const [harvestDate, setHarvestDate] = useState(new Date().toISOString().slice(0, 10));
-  const [b2bTierMin, setB2bTierMin] = useState<number>(30);
-  const [b2bTierPrice, setB2bTierPrice] = useState<number>(13500);
+  const [b2bTierMin, setB2bTierMin] = useState<number>(0);
+  const [b2bTierPrice, setB2bTierPrice] = useState<number>(0);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
 
   // My products

@@ -325,21 +325,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
             </div>
 
-            {/* Bottom Real Image Preview in Dark Panel */}
+            {/* Bottom Institutional Info Card in Dark Panel */}
             <div className="mt-8 pt-6 border-t border-slate-800/80">
-              <div className="relative rounded-2xl overflow-hidden border border-slate-700/60 shadow-xl group">
-                <img
-                  src={mode === 'REGISTER' ? registerTrucksImg : loginTruckImg}
-                  alt={mode === 'REGISTER' ? 'Centrais Logísticas de Angola' : 'Transporte Nacional Angola'}
-                  className="w-full h-32 sm:h-36 object-cover object-center group-hover:scale-105 transition duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-3 text-xs">
-                  <span className="font-bold text-amber-400 text-[10px] uppercase tracking-wider">
-                    {mode === 'REGISTER' ? 'Centrais e Armazéns Nacionais' : 'Corredores Rodoviários de Angola'}
+              <div className="relative rounded-2xl p-4 bg-slate-900/80 border border-slate-800 shadow-xl space-y-2">
+                <div className="flex items-center space-x-2 text-amber-400">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span className="font-bold text-[11px] uppercase tracking-wider">
+                    {mode === 'REGISTER' ? 'Rede Logística & Agrícola' : 'Ambiente Seguro de Transação'}
                   </span>
-                  <span className="text-[11px] text-white font-semibold">
-                    {mode === 'REGISTER' ? 'Infraestrutura Logística Integrada' : 'Fluxo Direto Produtor • Comerciante • Comprador'}
-                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+                  {mode === 'REGISTER' 
+                    ? 'Interligação em tempo real com o banco de dados oficial do AO MARKET e verificação documental.' 
+                    : 'Acesso seguro autenticado via Firebase com isolamento estrito de permissões.'}
+                </p>
+                <div className="flex items-center space-x-2 pt-1 text-[10px] text-slate-400">
+                  <Globe className="w-3 h-3 text-emerald-400" />
+                  <span>Cobertura nas 18 Províncias de Angola</span>
                 </div>
               </div>
             </div>

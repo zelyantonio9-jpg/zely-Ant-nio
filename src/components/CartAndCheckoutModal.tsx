@@ -120,48 +120,52 @@ export const CartAndCheckoutModal: React.FC<CartAndCheckoutModalProps> = ({
           <div className="space-y-3 text-xs">
             <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-slate-50">
               {cart.map(item => (
-                <div key={item.product.id} className="p-3.5 flex items-center justify-between gap-3 bg-white">
-                  <img
-                    src={item.product.images[0]}
-                    alt={item.product.title}
-                    referrerPolicy="no-referrer"
-                    className="w-12 h-12 rounded-xl object-cover bg-slate-100 border border-slate-200 shrink-0"
-                  />
+                <div key={item.product.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <img
+                      src={item.product.images[0]}
+                      alt={item.product.title}
+                      referrerPolicy="no-referrer"
+                      className="w-12 h-12 rounded-xl object-cover bg-slate-100 border border-slate-200 shrink-0"
+                    />
 
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-slate-900 text-xs truncate">{item.product.title}</h4>
-                    <div className="text-[11px] text-slate-500">
-                      Origem: {item.product.originMunicipality} • <span className="font-mono font-bold text-slate-800">{formatKz(item.product.price)}</span> / {item.product.unit}
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-bold text-slate-900 text-xs truncate">{item.product.title}</h4>
+                      <div className="text-[11px] text-slate-500">
+                        Origem: {item.product.originMunicipality} • <span className="font-mono font-bold text-slate-800">{formatKz(item.product.price)}</span> / {item.product.unit}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Quantity Controls */}
-                  <div className="flex items-center space-x-1 shrink-0">
-                    <button
-                      onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
-                      className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 hover:bg-slate-200 flex items-center justify-center text-slate-700 font-bold cursor-pointer"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="w-8 text-center font-bold text-slate-900 font-mono">{item.quantity}</span>
-                    <button
-                      onClick={() => updateCartQuantity(item.product.id, item.quantity + 1)}
-                      className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 hover:bg-slate-200 flex items-center justify-center text-slate-700 font-bold cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
-
-                  <div className="text-right shrink-0 min-w-[80px]">
-                    <div className="font-bold text-slate-900 text-xs font-mono">
-                      {formatKz(item.product.price * item.quantity)}
+                  {/* Quantity Controls & Price */}
+                  <div className="flex items-center justify-between sm:justify-end sm:space-x-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                    <div className="flex items-center space-x-1 shrink-0">
+                      <button
+                        onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
+                        className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 hover:bg-slate-200 flex items-center justify-center text-slate-700 font-bold cursor-pointer"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="w-8 text-center font-bold text-slate-900 font-mono">{item.quantity}</span>
+                      <button
+                        onClick={() => updateCartQuantity(item.product.id, item.quantity + 1)}
+                        className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 hover:bg-slate-200 flex items-center justify-center text-slate-700 font-bold cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => removeFromCart(item.product.id)}
-                      className="text-[10px] text-red-600 hover:text-red-700 flex items-center justify-end mt-1 ml-auto cursor-pointer"
-                    >
-                      <Trash2 className="w-2.5 h-2.5 mr-0.5" /> Remover
-                    </button>
+
+                    <div className="text-right shrink-0 min-w-[80px]">
+                      <div className="font-bold text-slate-900 text-xs font-mono">
+                        {formatKz(item.product.price * item.quantity)}
+                      </div>
+                      <button
+                        onClick={() => removeFromCart(item.product.id)}
+                        className="text-[10px] text-red-600 hover:text-red-700 flex items-center justify-end mt-0.5 ml-auto cursor-pointer"
+                      >
+                        <Trash2 className="w-2.5 h-2.5 mr-0.5" /> Remover
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -344,19 +348,19 @@ export const CartAndCheckoutModal: React.FC<CartAndCheckoutModalProps> = ({
             </div>
 
             {/* Form Footer */}
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => setStep('CART')}
-                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-semibold rounded-xl cursor-pointer"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-semibold rounded-xl cursor-pointer text-center"
               >
-                Voltar
+                Voltar ao Carrinho
               </button>
 
               <button
                 type="submit"
                 disabled={isProcessing}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center justify-center space-x-1.5 disabled:opacity-50 cursor-pointer"
               >
                 {isProcessing ? (
                   <span>Processando AO PAY...</span>

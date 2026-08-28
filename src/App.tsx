@@ -19,11 +19,13 @@ import { ArchitectureDocModal } from './components/ArchitectureDocModal';
 import { DocumentVerificationCenter } from './components/DocumentVerificationCenter';
 import { CompanyTeamManagement } from './components/CompanyTeamManagement';
 import { SecurityAuditorModal } from './components/SecurityAuditorModal';
+import { EcosystemRulesModal } from './components/EcosystemRulesModal';
 import { RestrictedAccessView } from './components/RestrictedAccessView';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { isTabAllowedForRole, getDefaultTabForRole } from './utils/rolePermissions';
 import { Logo } from './components/Logo';
 import { Order } from './types';
-import { Truck, ShieldCheck, KeyRound, Sparkles, MapPin, CheckCircle2, Award, Building2, ShieldAlert, MessageCircle } from 'lucide-react';
+import { Truck, ShieldCheck, KeyRound, Sparkles, MapPin, CheckCircle2, Award, Building2, ShieldAlert, MessageCircle, Scale } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { orders, currentUser, isAuthenticated, formatKz } = useMarket();
@@ -39,6 +41,7 @@ const MainAppContent: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isArchitectureOpen, setIsArchitectureOpen] = useState(false);
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [isDocCenterOpen, setIsDocCenterOpen] = useState(false);
   const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
   const [isSecurityAuditorOpen, setIsSecurityAuditorOpen] = useState(false);
@@ -69,6 +72,7 @@ const MainAppContent: React.FC = () => {
         onOpenAssistant={() => setIsAssistantOpen(true)}
         onOpenArchitecture={() => setIsArchitectureOpen(true)}
         onOpenAuth={handleOpenAuth}
+        onOpenRules={() => setIsRulesOpen(true)}
         onOpenDocCenter={() => setIsDocCenterOpen(true)}
         onOpenTeamManagement={() => setIsTeamManagementOpen(true)}
         onOpenSecurityAuditor={currentUser.role === 'admin' ? () => setIsSecurityAuditorOpen(true) : undefined}
@@ -115,13 +119,14 @@ const MainAppContent: React.FC = () => {
       )}
 
       {/* Main App Body View with Strict Profile Isolation */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-8">
         {activeTab === 'home' && (
           <HomePageView
             onNavigate={(tab) => setActiveTab(tab)}
             onOpenAuth={handleOpenAuth}
             onOpenCart={() => setIsCartOpen(true)}
             onOpenAssistant={() => setIsAssistantOpen(true)}
+            onOpenRules={() => setIsRulesOpen(true)}
           />
         )}
 
@@ -260,6 +265,12 @@ const MainAppContent: React.FC = () => {
         onClose={() => setIsArchitectureOpen(false)}
       />
 
+      {/* Official Ecosystem Rules Modal (14 Regras e Regra Central) */}
+      <EcosystemRulesModal
+        isOpen={isRulesOpen}
+        onClose={() => setIsRulesOpen(false)}
+      />
+
       {/* Document Verification & Trust Center Modal */}
       {isDocCenterOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -395,6 +406,13 @@ const MainAppContent: React.FC = () => {
               <span>Luanda • Huambo • Benguela • Huíla</span>
               <span>•</span>
               <button 
+                onClick={() => setIsRulesOpen(true)}
+                className="text-emerald-400 hover:text-emerald-300 underline font-semibold cursor-pointer"
+              >
+                Regras & Governação (14 Regras)
+              </button>
+              <span>•</span>
+              <button 
                 onClick={() => setIsArchitectureOpen(true)}
                 className="text-[#94a3b8] hover:text-white underline cursor-pointer"
               >
@@ -404,6 +422,15 @@ const MainAppContent: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Mobile Bottom Bar for native app-like UX on small screens */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onOpenCart={() => setIsCartOpen(true)}
+        onOpenAssistant={() => setIsAssistantOpen(true)}
+        onOpenRules={() => setIsRulesOpen(true)}
+      />
     </div>
   );
 };

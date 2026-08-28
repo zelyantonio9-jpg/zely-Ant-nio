@@ -20,14 +20,6 @@ import {
   INSSValidationResult,
   INSSAuditLog
 } from '../types';
-import { 
-  SEED_PROFILES, 
-  SEED_PRODUCTS, 
-  SEED_ORDERS, 
-  SEED_FREIGHT_LOADS, 
-  SEED_RFQS, 
-  SEED_DISPUTES 
-} from '../data/seedData';
 import { calculateFreightEstimate } from '../data/angolaGeoData';
 import { api } from '../services/apiClient';
 import { FirestoreSyncService } from '../services/firestoreService';
@@ -98,6 +90,9 @@ interface MarketContextType {
   respondToRfq: (rfqId: string, quotedPriceAOA: number) => void;
   openDispute: (data: Omit<DisputeRecord, 'id' | 'status' | 'createdAt'>) => void;
   resolveDispute: (disputeId: string, action: 'REFUND' | 'RELEASE', notes: string) => void;
+  submitVerifiedReview: (productId: string, orderId: string, rating: number, comment: string) => { success: boolean; message: string };
+  cancelOrderWithPolicy: (orderId: string, reason: string) => { success: boolean; message: string };
+  blockSuspiciousEntity: (entityId: string, reason: string) => { success: boolean; message: string };
   formatKz: (val: number) => string;
   markNotificationAsRead: (notifId: string) => void;
   addNotification: (title: string, message: string, type: EcosystemNotification['type']) => void;
@@ -164,7 +159,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.error(e);
       }
     }
-    return SEED_PROFILES;
+    return [];
   });
 
   // Current User Profile & Auth State
@@ -194,12 +189,30 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          const realOnly = parsed.filter((p: Product) => 
+            p && p.id && 
+            !p.id.startsWith('prod_milho') &&
+            !p.id.startsWith('prod_soja') &&
+            !p.id.startsWith('prod_mandioca') &&
+            !p.id.startsWith('prod_cafe') &&
+            !p.id.startsWith('prod_cimento') &&
+            !p.id.startsWith('prod_feijao') &&
+            !p.id.startsWith('prod_tomate') &&
+            !p.id.startsWith('prod_banana') &&
+            !p.id.startsWith('prod_carne') &&
+            !p.id.startsWith('prod_peixe') &&
+            !p.id.startsWith('prod_mel') &&
+            !p.id.startsWith('prod_demo') &&
+            !(p.images && p.images.some(img => typeof img === 'string' && (img.includes('unsplash.com') || img.includes('via.placeholder') || img.includes('picsum.photos'))))
+          );
+          return realOnly;
+        }
       } catch (e) {
         console.error(e);
       }
     }
-    return SEED_PRODUCTS;
+    return [];
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -212,7 +225,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.error(e);
       }
     }
-    return SEED_ORDERS;
+    return [];
   });
 
   const [freightLoads, setFreightLoads] = useState<FreightLoad[]>(() => {
@@ -225,7 +238,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.error(e);
       }
     }
-    return SEED_FREIGHT_LOADS;
+    return [];
   });
 
   const [rfqs, setRfqs] = useState<B2BQuotationRequest[]>(() => {
@@ -238,12 +251,12 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.error(e);
       }
     }
-    return SEED_RFQS;
+    return [];
   });
 
   const [disputes, setDisputes] = useState<DisputeRecord[]>(() => {
     const saved = localStorage.getItem('ao_market_disputes');
-    return saved ? JSON.parse(saved) : SEED_DISPUTES;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -364,17 +377,44 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Direct Admin login via 5-click secret gateway
   const loginAsAdminDirect = async (email: string, key?: string): Promise<boolean> => {
     const cleanEmail = email.trim().toLowerCase();
-    const adminUser = registeredUsers.find(u => u.role === 'admin' && (u.email.toLowerCase() === cleanEmail || cleanEmail === 'admin@aomarket.ao')) || SEED_PROFILES[0];
+    let adminUser = registeredUsers.find(u => u.role === 'admin' && (u.email.toLowerCase() === cleanEmail || cleanEmail === 'admin@aomarket.ao'));
     
-    if (adminUser) {
-      setCurrentUser(adminUser);
-      setIsAuthenticated(true);
-      // Save admin profile to Firestore if not already present
-      FirestoreSyncService.saveUser(adminUser);
-      addNotification('Consola de Supervisão Desbloqueada', `Sessão administrativa iniciada para ${adminUser.name}.`, 'SECURITY');
-      return true;
+    if (!adminUser) {
+      adminUser = {
+        id: 'usr_admin_master',
+        name: 'Administração Geral AO MARKET',
+        email: cleanEmail || 'admin@aomarket.ao',
+        phone: '+244 923 000 000',
+        role: 'admin',
+        province: 'Luanda',
+        municipality: 'Luanda',
+        address: 'Edifício Kilamba, Eixo Viário, Luanda, Angola',
+        companyName: 'AO MARKET Governação & Supervisão S.A.',
+        nif: '5001928374',
+        biNumber: '003928174LA042',
+        isFormalized: true,
+        verificationLevel: 5,
+        rating: 5.0,
+        reviewCount: 0,
+        completedTransactions: 0,
+        fulfillmentRate: 100,
+        totalSalesAOA: 0,
+        totalPurchasesAOA: 0,
+        joinedDate: new Date().toISOString().slice(0, 10),
+        registrationStatus: 'ACTIVE',
+        profileType: 'EMPRESA',
+        actorType: 'BUYER',
+        hasAcceptedTerms: true
+      };
+      setRegisteredUsers(prev => [...prev.filter(u => u.id !== adminUser!.id), adminUser!]);
     }
-    return false;
+    
+    setCurrentUser(adminUser);
+    setIsAuthenticated(true);
+    // Save admin profile to Firestore
+    FirestoreSyncService.saveUser(adminUser);
+    addNotification('Consola de Supervisão Desbloqueada', `Sessão administrativa iniciada para ${adminUser.name}.`, 'SECURITY');
+    return true;
   };
 
   const registerUser = (userData: Partial<UserProfile> & { name: string; role: UserRole; phone: string; province: string; municipality: string }): UserProfile => {
@@ -520,8 +560,8 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentUser(prev => updater(prev));
     }
 
-    addAuditLog(userId, `Documento Submetido: ${newDoc.title}`, `Ficheiro: ${newDoc.fileName}`);
-    addNotification('Documento Submetido', `O documento "${newDoc.title}" foi enviado e está em análise.`, 'SECURITY');
+    addAuditLog(userId, `Documento Submetido: ${newDoc.label}`, `Ficheiro: ${newDoc.fileName}`);
+    addNotification('Documento Submetido', `O documento "${newDoc.label}" foi enviado e está em análise.`, 'SECURITY');
   };
 
   const replaceUserDocument = (userId: string, docId: string, newFile: { fileName: string; fileSizeKb: number; fileMimeType: string }) => {
@@ -770,7 +810,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setRfqs([]);
     setDisputes([]);
     setCart([]);
-    setRegisteredUsers(SEED_PROFILES);
+    setRegisteredUsers([]);
     setCurrentUser(DEFAULT_GUEST_USER);
     setIsAuthenticated(false);
     
@@ -783,10 +823,10 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem('ao_market_rfqs', JSON.stringify([]));
     localStorage.setItem('ao_market_disputes', JSON.stringify([]));
     localStorage.setItem('ao_market_cart', JSON.stringify([]));
-    localStorage.setItem('ao_market_users', JSON.stringify(SEED_PROFILES));
+    localStorage.setItem('ao_market_users', JSON.stringify([]));
     localStorage.setItem('ao_market_current_user', JSON.stringify(DEFAULT_GUEST_USER));
     localStorage.setItem('ao_market_is_authenticated', JSON.stringify(false));
-    addNotification('Base de Dados Limpa', 'Todos os dados de teste foram eliminados com sucesso da base de dados Firebase.', 'SECURITY');
+    addNotification('Base de Dados Limpa', 'Todos os dados foram resetados na base de dados Firebase.', 'SECURITY');
   };
 
   const clearAllTransactions = () => {
@@ -1214,6 +1254,90 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const submitVerifiedReview = (productId: string, orderId: string, rating: number, comment: string): { success: boolean; message: string } => {
+    if (!isAuthenticated) {
+      return { success: false, message: 'Autenticação necessária para avaliar produtos.' };
+    }
+
+    const order = orders.find(o => o.id === orderId);
+    if (!order) {
+      return { success: false, message: 'Regra de Avaliações: Apenas utilizadores que participaram numa transação podem avaliar.' };
+    }
+
+    if (order.buyerId !== currentUser.id && currentUser.role !== 'admin') {
+      return { success: false, message: 'Regra de Avaliações: Apenas o comprador desta ordem tem legitimidade para avaliar.' };
+    }
+
+    if (order.status !== 'DELIVERED' && order.status !== 'COMPLETED') {
+      return { success: false, message: 'Regra de Avaliações: O produto só pode ser avaliado após a receção física confirmada da encomenda.' };
+    }
+
+    const hasItem = order.items.some(item => item.product.id === productId);
+    if (!hasItem) {
+      return { success: false, message: 'Este produto não faz parte dos itens desta encomenda.' };
+    }
+
+    // Update product rating
+    setProducts(prev => prev.map(p => {
+      if (p.id !== productId) return p;
+      const prevTotal = p.rating * p.reviewCount;
+      const newCount = p.reviewCount + 1;
+      const newRating = Number(((prevTotal + rating) / newCount).toFixed(1));
+      const updated = { ...p, rating: newRating, reviewCount: newCount };
+      FirestoreSyncService.saveProduct(updated);
+      return updated;
+    }));
+
+    addAuditLog(currentUser.id, 'REVIEW_SUBMITTED', `Avaliação verificada submetida com sucesso para o produto ${productId} (Ordem #${orderId}, Classificação: ${rating} estrelas)`);
+    addNotification('Avaliação Registada', 'A sua avaliação foi verificada e associada com sucesso ao produto.', 'ORDER');
+    return { success: true, message: 'Avaliação verificada registada com sucesso!' };
+  };
+
+  const cancelOrderWithPolicy = (orderId: string, reason: string): { success: boolean; message: string } => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return { success: false, message: 'Ordem não encontrada.' };
+
+    const isParty = order.buyerId === currentUser.id || order.producerId === currentUser.id || currentUser.role === 'admin';
+    if (!isParty) {
+      return { success: false, message: 'Sem permissão para cancelar este pedido.' };
+    }
+
+    // Rule 11: Cancelamentos e reembolsos específicos por estado
+    if (order.status === 'CREATED' || order.status === 'PAYMENT_PENDING' || order.status === 'PAID' || order.status === 'ACCEPTED') {
+      advanceOrderStatus(orderId, 'CANCELLED');
+      setTimeout(() => advanceOrderStatus(orderId, 'REFUNDED'), 500);
+      addAuditLog(currentUser.id, 'ORDER_CANCELLED_AUTOMATIC', `Cancelamento aprovado em fase pré-expedição. Ordem: #${orderId}. Motivo: ${reason}`);
+      return { success: true, message: 'Pedido cancelado com sucesso. O montante sob custódia foi reembolsado na totalidade.' };
+    }
+
+    if (order.status === 'PICKED_UP' || order.status === 'IN_TRANSIT' || order.status === 'DRIVER_ASSIGNED') {
+      return { 
+        success: false, 
+        message: 'A carga já se encontra despachada em transporte rodoviário. O cancelamento requer abertura de processo de mediação na câmara AO Protect.' 
+      };
+    }
+
+    if (order.status === 'DELIVERED' || order.status === 'COMPLETED') {
+      return { 
+        success: false, 
+        message: 'Mercadoria já entregue. Para não conformidade de produto, instaure uma reclamação no AO Protect.' 
+      };
+    }
+
+    return { success: false, message: 'Estado do pedido não permite cancelamento direto.' };
+  };
+
+  const blockSuspiciousEntity = (entityId: string, reason: string): { success: boolean; message: string } => {
+    if (currentUser.role !== 'admin' && currentUser.role !== 'support') {
+      return { success: false, message: 'Apenas a Supervisão Oficial pode emitir bloqueios preventivos.' };
+    }
+
+    updateAccountStatus(entityId, 'SUSPENSO', reason);
+    addAuditLog(entityId, 'FRAUD_SUSPENSION', `Entidade ${entityId} bloqueada preventivamente por suspeita de fraude/desintermediação. Motivo: ${reason}`);
+    addNotification('Bloqueio Preventivo Emitido', `A conta ${entityId} foi suspensa para proteção do ecossistema.`, 'SECURITY');
+    return { success: true, message: `Entidade ${entityId} suspensa preventivamente com sucesso.` };
+  };
+
   // INSS
   const [inssAuditLogs, setInssAuditLogs] = useState<INSSAuditLog[]>(() => INSSOfficialService.getAuditLogs());
 
@@ -1231,7 +1355,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const linkInssToProfile = async (validationResult: INSSValidationResult, userConsent: boolean): Promise<{ success: boolean; message: string }> => {
-    return await api.linkINSS(validationResult, userConsent);
+    return await api.linkINSSProfile(validationResult, userConsent);
   };
 
   const attemptInssModification = async (payload: any): Promise<any> => {
@@ -1299,6 +1423,9 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       respondToRfq,
       openDispute,
       resolveDispute,
+      submitVerifiedReview,
+      cancelOrderWithPolicy,
+      blockSuspiciousEntity,
       formatKz,
       markNotificationAsRead,
       addNotification,

@@ -96,7 +96,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   return (
     <div id="marketplace-view" className="space-y-6">
       {/* Header Comercial Simples e Direto */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-display font-bold text-slate-900">
             Catálogo de Produtos em Angola
@@ -107,21 +107,21 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         </div>
 
         {/* Informação Resumida */}
-        <div className="flex items-center space-x-3 text-xs bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl shrink-0">
+        <div className="flex items-center space-x-3 text-xs bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl shrink-0 self-start sm:self-auto">
           <span className="text-slate-500 font-medium">Produtos listados:</span>
           <span className="font-bold text-slate-900 font-mono text-sm">{products.length}</span>
         </div>
       </div>
 
       {/* Barra de Filtros e Categorias */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
         {/* Categorias em Abas */}
         <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar pb-1">
           {categories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                 selectedCategory === cat.id
                   ? 'bg-[#0A2540] text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -133,8 +133,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         </div>
 
         {/* Filtros secundários: Província e Feito em Angola */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
-          <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Seletor de Província */}
             <div className="flex items-center space-x-2">
               <span className="text-slate-500 font-medium">Província:</span>
@@ -157,8 +157,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 checked={onlyMadeInAngola}
                 onChange={(e) => setOnlyMadeInAngola(e.target.checked)}
                 className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
-              >
-              </input>
+              />
               <span>Apenas Feito em Angola</span>
             </label>
           </div>
@@ -172,21 +171,33 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
       {/* Grelha de Produtos */}
       {filteredProducts.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-3 shadow-xs">
-          <Filter className="w-8 h-8 text-slate-400 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-900">Nenhum produto encontrado</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Tente selecionar "Todas as 18 Províncias" ou escolher outra categoria.
-          </p>
-          <button
-            onClick={() => {
-              setSelectedCategory('todos');
-              setSelectedProvince('todas');
-              setOnlyMadeInAngola(false);
-            }}
-            className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl transition cursor-pointer"
-          >
-            Ver todos os produtos
-          </button>
+          {products.length === 0 ? (
+            <>
+              <Sprout className="w-10 h-10 text-emerald-600 mx-auto" />
+              <h3 className="text-base font-bold text-slate-900">Não existem produtos disponíveis.</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                O catálogo está pronto para receber produtos publicados por produtores rurais, cooperativas e comerciantes certificados.
+              </p>
+            </>
+          ) : (
+            <>
+              <Filter className="w-8 h-8 text-slate-400 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-900">Nenhum produto encontrado para estes filtros</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Tente selecionar "Todas as 18 Províncias" ou escolher outra categoria.
+              </p>
+              <button
+                onClick={() => {
+                  setSelectedCategory('todos');
+                  setSelectedProvince('todas');
+                  setOnlyMadeInAngola(false);
+                }}
+                className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Ver todos os produtos
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -235,10 +246,17 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                       <span className="font-semibold text-slate-700 truncate" title={product.producerName}>
                         {product.producerName}
                       </span>
-                      <div className="flex items-center text-slate-700 space-x-1 text-xs">
-                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                        <span className="font-bold">{product.rating}</span>
-                      </div>
+                      {product.rating > 0 && product.reviewCount > 0 ? (
+                        <div className="flex items-center text-slate-700 space-x-1 text-xs">
+                          <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                          <span className="font-bold">{product.rating}</span>
+                          <span className="text-[10px] text-slate-400">({product.reviewCount})</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-emerald-700 bg-emerald-50 font-medium px-1.5 py-0.5 rounded">
+                          Lote Novo
+                        </span>
+                      )}
                     </div>
 
                     <h3 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 leading-snug">

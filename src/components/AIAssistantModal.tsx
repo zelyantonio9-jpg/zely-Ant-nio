@@ -13,13 +13,13 @@ interface AIAssistantModalProps {
 }
 
 export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser } = useMarket();
+  const { currentUser, products, formatKz } = useMarket();
 
   const [inputQuery, setInputQuery] = useState('');
   const [messages, setMessages] = useState<Array<{ role: 'assistant' | 'user'; content: string }>>([
     {
       role: 'assistant',
-      content: `Olá ${currentUser.name}! Sou o **AO Assist**, a inteligência especializada no ecossistema económico do AO MARKET.\n\nComo posso ajudar hoje?\n- 🌾 **Produtores**: Escrever descrições de lotes e calcular rendimento de colheita\n- 🛒 **Compradores & Grossistas**: Encontrar fornecedores de grãos, café e cimento por província\n- 🛡️ **Formalização**: Simular enquadramento na Segurança Social (INSS) e benefícios do PREI`
+      content: `Olá ${currentUser.name}! Sou o **AO Assist**, o assistente oficial do ecossistema AO MARKET.\n\nComo posso ajudar hoje?\n- 🌾 **Produtores**: Escrever descrições técnicas de colheitas e publicar lotes\n- 🛒 **Compradores & Grossistas**: Consultar o catálogo em tempo real e cotações interprovinciais\n- 🛡️ **Formalização**: Apoio na integração com a Segurança Social (INSS Angola)`
     }
   ]);
   const [isThinking, setIsThinking] = useState(false);
@@ -39,19 +39,32 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ isOpen, onCl
       let reply = '';
       const q = query.toLowerCase();
 
-      if (q.includes('milho') || q.includes('huambo') || q.includes('comprar')) {
-        reply = `Encontrei produtores certificados no Huambo:\n\n1. **Milho Amarelo Seco Grão Selecionado do Bailundo (Saco 50kg)**\n- Produtor: Manuel Kalandula (Fazenda Vale do Bailundo)\n- Preço: 18.500 Kz (Desconto B2B: 15.200 Kz para +200 sacos)\n- Frete para Luanda: ~48.000 Kz via Camião 3.5T com tempo estimado de 2 dias úteis.\n\nDeseja adicionar este lote diretamente ao seu carrinho com garantia AO Protect?`;
+      if (q.includes('milho') || q.includes('huambo') || q.includes('comprar') || q.includes('produto') || q.includes('lote')) {
+        const matching = products.filter(p => 
+          p.title.toLowerCase().includes('milho') || 
+          p.originProvince.toLowerCase().includes('huambo') ||
+          p.category.toLowerCase().includes('graos')
+        );
+
+        if (matching.length > 0) {
+          const p = matching[0];
+          reply = `Encontrei **${matching.length}** lote(s) real(is) registado(s) no banco de dados:\n\n1. **${p.title}**\n- Fornecedor: ${p.producerName}\n- Origem: ${p.originMunicipality}, ${p.originProvince}\n- Preço: ${formatKz(p.price)} por ${p.unit}\n- Stock disponível: ${p.availableStock} ${p.unit}\n\nPode aceder ao Marketplace para submeter a sua ordem de compra ou solicitar frete integrado.`;
+        } else if (products.length > 0) {
+          reply = `Atualmente temos ${products.length} produto(s) ativo(s) na plataforma oficial. Pode explorar o catálogo completo no separador Marketplace.`;
+        } else {
+          reply = `Atualmente não existem produtos registados nesta categoria na base de dados. Se é produtor ou cooperativa agrícola, utilize o **Painel do Produtor** para cadastrar a sua colheita com fotos reais.`;
+        }
       } else if (q.includes('inss') || q.includes('segurança social') || q.includes('formalizar') || q.includes('prei')) {
-        reply = `**Guia de Formalização e Segurança Social (INSS Angola):**\n\n- **Regime**: Trabalhador por Conta Própria (Decreto Presidencial n.º 227/18).\n- **Contribuição**: ~8% sobre a base declarada (mínimo de 70.000 Kz = 5.600 Kz/mês).\n- **Benefícios Garantidos**: Reforma por Velhice, Subsídio de Maternidade (90 dias), Invalidez e Sobrevivência à família.\n- **Vantagem no AO MARKET**: Ao registar o seu número de beneficiário, a sua conta recebe o **Selo de Vendedor Formalizado de Nível 4**, permitindo faturar a grandes empresas.`;
+        reply = `**Guia de Formalização e Segurança Social (INSS Angola):**\n\n- **Regime**: Trabalhador por Conta Própria (Decreto Presidencial n.º 227/18).\n- **Benefícios Garantidos**: Reforma por Velhice, Subsídio de Maternidade (90 dias), Invalidez e Sobrevivência à família.\n- **Vantagem no AO MARKET**: Ao registar e validar o seu NIF/NISS no Portal INSS, o seu perfil recebe o **Selo de Conta Verificada**, permitindo faturar com conformidade legal.`;
       } else if (q.includes('descrever') || q.includes('lote') || q.includes('colheita')) {
-        reply = `Aqui está uma sugestão de descrição profissional para o seu lote:\n\n*"Lote de alta pureza colhido na safra atual no Planalto Central de Angola. Grãos selecionados, teor de humidade controlado (<13%), sem impurezas ou pragas. Acondicionado em sacaria nova de ráfia de 50kg, pronto para expedição rodoviária imediata com rastreio AO Logistics e emissão de fatura comercial."*`;
+        reply = `Aqui está um modelo de descrição técnica recomendada para lotes no AO MARKET:\n\n*"Lote agrícola de produção nacional colhido na época corrente. Especificação de grau e humidade controlados, acondicionado em sacaria apropriada, pronto para expedição com rastreio rodoviário e documentação de transporte oficial."*`;
       } else {
-        reply = `Compreendido! O ecossistema AO MARKET integra todas as etapas da cadeia: produção no campo, pagamento protegido via AO PAY, frete rodoviário interprovincial com PIN OTP e incentivos à formalização com o INSS.\n\nComo gostaria de prosseguir?`;
+        reply = `O ecossistema AO MARKET conecta diretamente a produção agrícola, comércio grossista e transportadoras nas 18 províncias de Angola com base de dados centralizada no Firebase.\n\nComo posso ser útil na sua operação?`;
       }
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
       setIsThinking(false);
-    }, 800);
+    }, 600);
   };
 
   return (

@@ -15,14 +15,6 @@ import {
   UserRole
 } from './src/types';
 import { 
-  SEED_PROFILES, 
-  SEED_PRODUCTS, 
-  SEED_ORDERS, 
-  SEED_FREIGHT_LOADS, 
-  SEED_CHAT_MESSAGES, 
-  SEED_SECURITY_LOGS 
-} from './src/data/seedData';
-import { 
   hasPermission, 
   checkProductOwnership, 
   checkOrderAccess, 
@@ -35,14 +27,14 @@ import {
 import { ROLE_PERMISSIONS_MATRIX } from './src/utils/rbacMatrix';
 import { INSSOfficialService } from './src/services/inssService';
 
-// In-Memory Database / State for AO MARKET
-let dbUsers: UserProfile[] = [...SEED_PROFILES];
-let dbProducts: Product[] = [...SEED_PRODUCTS];
-let dbOrders: Order[] = [...SEED_ORDERS];
-let dbLoads: FreightLoad[] = [...SEED_FREIGHT_LOADS];
-let dbMessages: ChatMessage[] = [...SEED_CHAT_MESSAGES];
+// In-Memory Database / State for AO MARKET API routes
+let dbUsers: UserProfile[] = [];
+let dbProducts: Product[] = [];
+let dbOrders: Order[] = [];
+let dbLoads: FreightLoad[] = [];
+let dbMessages: ChatMessage[] = [];
 let dbAlerts: DisintermediationAlert[] = [];
-let dbAuditLogs: SecurityAuditEntry[] = [...SEED_SECURITY_LOGS];
+let dbAuditLogs: SecurityAuditEntry[] = [];
 
 function recordAudit(entry: Omit<SecurityAuditEntry, 'id' | 'timestamp'>) {
   const log: SecurityAuditEntry = {

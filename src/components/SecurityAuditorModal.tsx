@@ -551,119 +551,48 @@ export const SecurityAuditorModal: React.FC<SecurityAuditorModalProps> = ({ isOp
           {activeTab === 'ROLE_SIMULATOR' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-sm font-extrabold text-white">Alternar Instantaneamente de Conta / Persona</h3>
+                <h3 className="text-sm font-extrabold text-white">Contas e Perfis Registados na Base de Dados</h3>
                 <p className="text-xs text-slate-400">
-                  Clique numa das contas para experimentar o AO MARKET do ponto de vista exato daquele perfil e validar os limites de acesso no frontend e no backend.
+                  Selecione uma das contas reais registadas no Firebase para testar as permissões e isolamento de dados daquele perfil.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                
-                {/* Admin */}
-                <div 
-                  onClick={() => { login('admin@aomarket.ao'); onClose(); }}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-amber-400 transition cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">ADMINISTRADOR</span>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
-                  </div>
-                  <div className="text-xs font-bold text-white">Direção de Supervisão AO MARKET</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Acesso irrestrito a todos os portais e supervisão nacional.</div>
+              {registeredUsers.length === 0 ? (
+                <div className="bg-slate-950 p-8 rounded-2xl border border-slate-800 text-center space-y-3">
+                  <ShieldCheck className="w-8 h-8 text-amber-400 mx-auto" />
+                  <div className="text-sm font-bold text-white">Nenhum utilizador registado ainda no Firebase</div>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Crie uma conta através do botão "Criar Conta" ou aceda como Administrador para registar as primeiras entidades do ecossistema.
+                  </p>
                 </div>
-
-                {/* Support */}
-                <div 
-                  onClick={() => { login('suporte@aomarket.ao'); onClose(); }}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-amber-400 transition cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 text-[10px] font-bold">SUPORTE & OPS</span>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
-                  </div>
-                  <div className="text-xs font-bold text-white">Mesa de Apoio & Mediação</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Validação documental, mediação e suporte operacional.</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {registeredUsers.map((user) => (
+                    <div 
+                      key={user.id}
+                      onClick={() => { login(user.email || user.id); onClose(); }}
+                      className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-amber-400 transition cursor-pointer group"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          user.role === 'admin' ? 'bg-rose-500/20 text-rose-300' :
+                          user.role === 'producer' ? 'bg-emerald-500/20 text-emerald-300' :
+                          user.role === 'driver' || user.role === 'logistics_company' ? 'bg-purple-500/20 text-purple-300' :
+                          user.role === 'support' ? 'bg-teal-500/20 text-teal-300' :
+                          'bg-blue-500/20 text-blue-300'
+                        }`}>
+                          {user.role}
+                        </span>
+                        <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
+                      </div>
+                      <div className="text-xs font-bold text-white truncate">{user.name}</div>
+                      <div className="text-[11px] text-slate-400 mt-1 truncate">
+                        {user.companyName || user.email || `${user.municipality}, ${user.province}`}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                {/* Producer A */}
-                <div 
-                  onClick={() => { login('produtor.huambo@fazenda.ao'); onClose(); }}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-amber-400 transition cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">PRODUTOR A</span>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
-                  </div>
-                  <div className="text-xs font-bold text-white">Fazenda Boa Esperança (Huambo)</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Publicação de colheitas de milho e batata. Gestão de lotes próprios.</div>
-                </div>
-
-                {/* Producer B */}
-                <div 
-                  onClick={() => { login('produtor.cuanza@fazenda.ao'); onClose(); }}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-amber-400 transition cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">PRODUTOR B</span>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
-                  </div>
-                  <div className="text-xs font-bold text-white">Cooperativa AgroCuanza (Cuanza Sul)</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Não pode editar os produtos da Fazenda Boa Esperança.</div>
-                </div>
-
-                {/* Buyer */}
-                <div 
-                  onClick={() => { login('compras@superluanda.co.ao'); onClose(); }}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-amber-400 transition cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold">COMPRADOR</span>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
-                  </div>
-                  <div className="text-xs font-bold text-white">Rede Supermercados Luanda</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Realização de compras, pagamentos sob custódia e rastreio.</div>
-                </div>
-
-                {/* Transporter */}
-                <div 
-                  onClick={() => { login('logistica@express.co.ao'); onClose(); }}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-amber-400 transition cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-bold">TRANSPORTADOR</span>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
-                  </div>
-                  <div className="text-xs font-bold text-white">Transportes Kwanza Express</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Bolsa de cargas rodoviárias, rotas e confirmação de entrega.</div>
-                </div>
-
-                {/* Company A Admin */}
-                <div 
-                  onClick={() => { login('admin@agrosul.co.ao'); onClose(); }}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-amber-400 transition cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">EMPRESA A (ADMIN)</span>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
-                  </div>
-                  <div className="text-xs font-bold text-white">AgroComercial do Sul Lda</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Gestão de equipa interna e operações da Empresa A.</div>
-                </div>
-
-                {/* Company B Admin */}
-                <div 
-                  onClick={() => { login('admin@benguelalog.co.ao'); onClose(); }}
-                  className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-amber-400 transition cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">EMPRESA B (ADMIN)</span>
-                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
-                  </div>
-                  <div className="text-xs font-bold text-white">Benguela Distribuição Lda</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Isolamento multi-tenant: Bloqueado de ver dados da Empresa A.</div>
-                </div>
-
-              </div>
+              )}
             </div>
           )}
 

@@ -72,7 +72,39 @@ export class FirestoreSyncService {
     const q = query(collection(db, 'products'));
     return onSnapshot(q, (snapshot) => {
       const items: Product[] = [];
-      snapshot.forEach((d) => items.push(d.data() as Product));
+      const mockIdsToDelete: string[] = [];
+      snapshot.forEach((d) => {
+        const p = d.data() as Product;
+        const isMock = 
+          !p.id ||
+          p.id.startsWith('prod_milho') ||
+          p.id.startsWith('prod_soja') ||
+          p.id.startsWith('prod_mandioca') ||
+          p.id.startsWith('prod_cafe') ||
+          p.id.startsWith('prod_cimento') ||
+          p.id.startsWith('prod_feijao') ||
+          p.id.startsWith('prod_tomate') ||
+          p.id.startsWith('prod_banana') ||
+          p.id.startsWith('prod_carne') ||
+          p.id.startsWith('prod_peixe') ||
+          p.id.startsWith('prod_mel') ||
+          p.id.startsWith('prod_demo') ||
+          (p.images && p.images.some(img => typeof img === 'string' && (img.includes('unsplash.com') || img.includes('via.placeholder') || img.includes('picsum.photos'))));
+
+        if (isMock) {
+          mockIdsToDelete.push(d.id);
+        } else {
+          items.push(p);
+        }
+      });
+
+      // Cleanup any mock artifacts from cloud Firestore
+      if (mockIdsToDelete.length > 0) {
+        const batch = writeBatch(db);
+        mockIdsToDelete.forEach(id => batch.delete(doc(db, 'products', id)));
+        batch.commit().catch(e => console.warn('[Firestore] Error deleting legacy mock products:', e));
+      }
+
       onUpdate(items);
     }, (error) => {
       console.warn('[Firestore] Products subscription notice:', error);

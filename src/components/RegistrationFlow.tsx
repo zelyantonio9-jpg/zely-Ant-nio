@@ -454,7 +454,7 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
       {/* Header */}
       <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between border-b border-slate-700 shrink-0">
         <div className="flex items-center space-x-3">
-          <Logo />
+          <Logo variant="badge" size="sm" />
           <div>
             <div className="font-extrabold text-sm sm:text-base tracking-tight text-white flex items-center gap-2">
               <span>Registo de Identidade Digital</span>

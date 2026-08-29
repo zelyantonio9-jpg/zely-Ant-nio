@@ -12,7 +12,9 @@ import {
   SecurityTestCase, 
   SecurityTestResult,
   OrderStatus,
-  UserRole
+  UserRole,
+  ProductReview,
+  PlatformConfig
 } from './src/types';
 import { 
   hasPermission, 
@@ -35,6 +37,17 @@ let dbLoads: FreightLoad[] = [];
 let dbMessages: ChatMessage[] = [];
 let dbAlerts: DisintermediationAlert[] = [];
 let dbAuditLogs: SecurityAuditEntry[] = [];
+let dbReviews: ProductReview[] = [];
+let dbFavorites: Record<string, string[]> = {};
+let dbPlatformConfig: PlatformConfig = {
+  escrowHoldDays: 3,
+  marketplaceCommissionPercent: 1.5,
+  disintermediationAlertsEnabled: true,
+  requireBiForHighValueTransactions: true,
+  minimumOrderValueAOA: 1000,
+  lastUpdatedBy: 'Sistema Oficial',
+  lastUpdatedAt: new Date().toISOString()
+};
 
 function recordAudit(entry: Omit<SecurityAuditEntry, 'id' | 'timestamp'>) {
   const log: SecurityAuditEntry = {
@@ -266,6 +279,149 @@ async function startServer() {
     return res.json({ success: true, message: 'Utilizador removido com sucesso.' });
   });
 
+  // Update own user profile
+  app.put('/api/auth/profile', (req, res) => {
+    const currentUser = (req as any).user as UserProfile | null;
+    if (!currentUser) {
+      return res.status(401).json({ error: 'Autenticação necessária para atualizar o perfil.' });
+    }
+
+    const { name, phone, province, municipality, address, entityType, nif, biNumber, bankDetails, avatar } = req.body;
+    
+    if (name) currentUser.name = name;
+    if (phone) currentUser.phone = phone;
+    if (province) currentUser.province = province;
+    if (municipality) currentUser.municipality = municipality;
+    if (address !== undefined) currentUser.address = address;
+    if (entityType) currentUser.entityType = entityType;
+    if (nif !== undefined) currentUser.nif = nif;
+    if (biNumber !== undefined) currentUser.biNumber = biNumber;
+    if (bankDetails) currentUser.bankDetails = bankDetails;
+    if (avatar !== undefined) currentUser.avatar = avatar;
+
+    recordAudit({
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+      actorRole: currentUser.role,
+      actionRequested: 'PUT /api/auth/profile',
+      targetResource: 'users',
+      resourceId: currentUser.id,
+      decision: 'ALLOWED',
+      httpStatus: 200
+    });
+
+    return res.json({ success: true, user: currentUser });
+  });
+
+  // User Favorites API
+  app.get('/api/favorites', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    if (!user) {
+      return res.status(401).json({ error: 'Faça login para consultar os seus favoritos.' });
+    }
+    const favorites = dbFavorites[user.id] || [];
+    return res.json(favorites);
+  });
+
+  app.post('/api/favorites/:productId/toggle', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    const { productId } = req.params;
+
+    if (!user) {
+      return res.status(401).json({ error: 'Faça login para adicionar produtos aos favoritos.' });
+    }
+
+    const userFavs = dbFavorites[user.id] || [];
+    const exists = userFavs.includes(productId);
+    let updated: string[];
+
+    if (exists) {
+      updated = userFavs.filter(id => id !== productId);
+    } else {
+      updated = [...userFavs, productId];
+    }
+
+    dbFavorites[user.id] = updated;
+    return res.json({ success: true, isFavorite: !exists, favorites: updated });
+  });
+
+  // Reviews API
+  app.get('/api/reviews', (req, res) => {
+    const { productId } = req.query;
+    if (productId && typeof productId === 'string') {
+      const filtered = dbReviews.filter(r => r.productId === productId);
+      return res.json(filtered);
+    }
+    return res.json(dbReviews);
+  });
+
+  app.post('/api/reviews', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    if (!user) {
+      return res.status(401).json({ error: 'Autenticação necessária para avaliar produtos.' });
+    }
+
+    const { productId, orderId, rating, comment } = req.body;
+    if (!productId || !orderId || !rating || !comment) {
+      return res.status(400).json({ error: 'Dados incompletos para submissão de avaliação.' });
+    }
+
+    const order = dbOrders.find(o => o.id === orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Ordem de compra não encontrada.' });
+    }
+
+    if (order.buyerId !== user.id && user.role !== 'admin') {
+      return res.status(403).json({ error: 'Apenas o comprador verificado desta ordem tem legitimidade para avaliar.' });
+    }
+
+    if (order.status !== 'DELIVERED' && order.status !== 'COMPLETED') {
+      return res.status(422).json({ error: 'Avaliações só podem ser submetidas após a entrega física confirmada do produto.' });
+    }
+
+    const hasItem = order.items.some(item => item.productId === productId);
+    if (!hasItem) {
+      return res.status(422).json({ error: 'Este produto não faz parte dos itens desta encomenda.' });
+    }
+
+    const newReview: ProductReview = {
+      id: `rev_${Date.now()}`,
+      productId,
+      orderId,
+      userId: user.id,
+      userName: user.name,
+      userProvince: user.province,
+      userVerificationLevel: user.verificationLevel,
+      rating: Math.max(1, Math.min(5, Number(rating))),
+      comment: String(comment).trim(),
+      createdAt: new Date().toISOString(),
+      verifiedPurchase: true
+    };
+
+    dbReviews.unshift(newReview);
+
+    // Update product rating and review count
+    const prod = dbProducts.find(p => p.id === productId);
+    if (prod) {
+      const prevTotal = prod.rating * prod.reviewCount;
+      prod.reviewCount += 1;
+      prod.rating = Number(((prevTotal + newReview.rating) / prod.reviewCount).toFixed(1));
+    }
+
+    recordAudit({
+      actorId: user.id,
+      actorName: user.name,
+      actorRole: user.role,
+      actionRequested: `POST /api/reviews (Product: ${productId}, Order: ${orderId})`,
+      targetResource: 'reviews',
+      resourceId: newReview.id,
+      decision: 'ALLOWED',
+      httpStatus: 201
+    });
+
+    return res.status(201).json({ success: true, review: newReview, productRating: prod?.rating, reviewCount: prod?.reviewCount });
+  });
+
   // =================================================================
   // 2. PRODUCTS API (RBAC & Ownership Protected)
   // =================================================================
@@ -401,6 +557,127 @@ async function startServer() {
 
     dbProducts = dbProducts.filter(p => p.id !== id);
     return res.json({ success: true, message: 'Produto removido com sucesso.' });
+  });
+
+  // Seller Quick Stock Update API
+  app.put('/api/products/:id/stock', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    const { id } = req.params;
+    const { availableStock } = req.body;
+
+    const product = dbProducts.find(p => p.id === id);
+    if (!product) return res.status(404).json({ error: 'Produto não encontrado.' });
+
+    const ownerCheck = checkProductOwnership(user, product, 'stock');
+    if (!ownerCheck.allowed) {
+      recordAudit({
+        actorId: user ? user.id : 'anonymous',
+        actorName: user ? user.name : 'Visitante',
+        actorRole: user ? user.role : 'visitor',
+        companyId: user?.companyId,
+        actionRequested: `PUT /api/products/${id}/stock`,
+        targetResource: 'products',
+        resourceId: id,
+        decision: ownerCheck.errorCode === 'UNAUTHENTICATED' ? 'DENIED_UNAUTHENTICATED' : 'DENIED_OWNERSHIP',
+        httpStatus: ownerCheck.httpStatus,
+        rejectionReason: ownerCheck.reason
+      });
+      return res.status(ownerCheck.httpStatus).json({ error: ownerCheck.reason, errorCode: ownerCheck.errorCode });
+    }
+
+    product.availableStock = Math.max(0, Number(availableStock) || 0);
+    return res.json({ success: true, product });
+  });
+
+  // Seller Quick Price Update API
+  app.put('/api/products/:id/price', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    const { id } = req.params;
+    const { price, b2bBulkPricing } = req.body;
+
+    const product = dbProducts.find(p => p.id === id);
+    if (!product) return res.status(404).json({ error: 'Produto não encontrado.' });
+
+    const ownerCheck = checkProductOwnership(user, product, 'update');
+    if (!ownerCheck.allowed) {
+      recordAudit({
+        actorId: user ? user.id : 'anonymous',
+        actorName: user ? user.name : 'Visitante',
+        actorRole: user ? user.role : 'visitor',
+        companyId: user?.companyId,
+        actionRequested: `PUT /api/products/${id}/price`,
+        targetResource: 'products',
+        resourceId: id,
+        decision: ownerCheck.errorCode === 'UNAUTHENTICATED' ? 'DENIED_UNAUTHENTICATED' : 'DENIED_OWNERSHIP',
+        httpStatus: ownerCheck.httpStatus,
+        rejectionReason: ownerCheck.reason
+      });
+      return res.status(ownerCheck.httpStatus).json({ error: ownerCheck.reason, errorCode: ownerCheck.errorCode });
+    }
+
+    if (price !== undefined && Number(price) > 0) {
+      product.price = Number(price);
+    }
+    if (b2bBulkPricing && Array.isArray(b2bBulkPricing)) {
+      product.b2bBulkPricing = b2bBulkPricing;
+    }
+
+    return res.json({ success: true, product });
+  });
+
+  // Admin Products Moderation API
+  app.get('/api/admin/products', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    if (!user || (user.role !== 'admin' && user.role !== 'support')) {
+      return res.status(403).json({ error: 'Acesso restrito à moderação de produtos.' });
+    }
+    return res.json(dbProducts);
+  });
+
+  // Admin Platform Config API
+  app.get('/api/admin/config', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    if (!user || (user.role !== 'admin' && user.role !== 'support')) {
+      return res.status(403).json({ error: 'Acesso restrito às configurações da plataforma.' });
+    }
+    return res.json(dbPlatformConfig);
+  });
+
+  app.put('/api/admin/config', (req, res) => {
+    const user = (req as any).user as UserProfile | null;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: 'Apenas Administradores podem atualizar as configurações da plataforma.' });
+    }
+
+    const {
+      escrowHoldDays,
+      marketplaceCommissionPercent,
+      disintermediationAlertsEnabled,
+      requireBiForHighValueTransactions,
+      minimumOrderValueAOA
+    } = req.body;
+
+    if (escrowHoldDays !== undefined) dbPlatformConfig.escrowHoldDays = Number(escrowHoldDays);
+    if (marketplaceCommissionPercent !== undefined) dbPlatformConfig.marketplaceCommissionPercent = Number(marketplaceCommissionPercent);
+    if (disintermediationAlertsEnabled !== undefined) dbPlatformConfig.disintermediationAlertsEnabled = !!disintermediationAlertsEnabled;
+    if (requireBiForHighValueTransactions !== undefined) dbPlatformConfig.requireBiForHighValueTransactions = !!requireBiForHighValueTransactions;
+    if (minimumOrderValueAOA !== undefined) dbPlatformConfig.minimumOrderValueAOA = Number(minimumOrderValueAOA);
+
+    dbPlatformConfig.lastUpdatedBy = user.name;
+    dbPlatformConfig.lastUpdatedAt = new Date().toISOString();
+
+    recordAudit({
+      actorId: user.id,
+      actorName: user.name,
+      actorRole: user.role,
+      actionRequested: 'PUT /api/admin/config',
+      targetResource: 'platform_config',
+      decision: 'ALLOWED',
+      httpStatus: 200,
+      metadata: dbPlatformConfig
+    });
+
+    return res.json({ success: true, config: dbPlatformConfig });
   });
 
   // =================================================================

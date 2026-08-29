@@ -200,6 +200,10 @@ export class FirestoreSyncService {
     }
   }
 
+  public static async saveUserProfile(user: UserProfile): Promise<void> {
+    return this.saveUser(user);
+  }
+
   public static async deleteUser(userId: string): Promise<void> {
     try {
       await deleteDoc(doc(db, 'users', userId));

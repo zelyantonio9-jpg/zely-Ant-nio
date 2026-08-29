@@ -41,7 +41,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         return { tab: 'logistics', label: 'Cargas', icon: Truck };
       case 'admin':
       case 'support':
-        return { tab: 'admin', label: 'Supervisão', icon: Scale };
+        return { tab: 'admin', label: 'Painel Admin', icon: Scale };
       default:
         return { tab: 'producer', label: 'Vender', icon: Sprout };
     }

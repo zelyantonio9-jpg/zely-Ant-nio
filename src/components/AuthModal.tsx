@@ -32,13 +32,15 @@ interface AuthModalProps {
   onClose: () => void;
   initialMode?: 'LOGIN' | 'REGISTER';
   onSuccess?: () => void;
+  onOpenLegal?: (tab: 'terms' | 'privacy' | 'governance') => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   initialMode = 'LOGIN',
-  onSuccess
+  onSuccess,
+  onOpenLegal
 }) => {
   const { login, registerEnhancedUser } = useMarket();
 
@@ -630,7 +632,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         className="mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500 accent-amber-600"
                       />
                       <span className="leading-snug">
-                        Li e concordo com os <strong className="text-slate-900">Termos de Uso</strong> e a <strong className="text-slate-900">Política de Privacidade</strong> do AO MARKET.
+                        Li e concordo com os{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onOpenLegal) onOpenLegal('terms');
+                          }}
+                          className="font-extrabold text-amber-900 hover:underline cursor-pointer"
+                        >
+                          Termos & Condições
+                        </button>{' '}
+                        e a{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onOpenLegal) onOpenLegal('privacy');
+                          }}
+                          className="font-extrabold text-amber-900 hover:underline cursor-pointer"
+                        >
+                          Política de Privacidade
+                        </button>{' '}
+                        do AO MARKET.
                       </span>
                     </label>
                   </div>

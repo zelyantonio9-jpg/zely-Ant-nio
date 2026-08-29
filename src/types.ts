@@ -666,3 +666,27 @@ export interface SecurityTestResult {
   message: string;
 }
 
+export interface ProductReview {
+  id: string;
+  productId: string;
+  orderId: string;
+  userId: string;
+  userName: string;
+  userProvince?: string;
+  userVerificationLevel?: VerificationLevel;
+  rating: number; // 1 - 5
+  comment: string;
+  createdAt: string;
+  verifiedPurchase: boolean;
+}
+
+export interface PlatformConfig {
+  escrowHoldDays: number;
+  marketplaceCommissionPercent: number;
+  disintermediationAlertsEnabled: boolean;
+  requireBiForHighValueTransactions: boolean;
+  minimumOrderValueAOA: number;
+  lastUpdatedBy?: string;
+  lastUpdatedAt?: string;
+}
+

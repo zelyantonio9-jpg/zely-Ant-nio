@@ -18,7 +18,9 @@ import {
   CompanyTeamMember,
   RegistrationAuditLog,
   INSSValidationResult,
-  INSSAuditLog
+  INSSAuditLog,
+  ProductReview,
+  PlatformConfig
 } from '../types';
 import { calculateFreightEstimate } from '../data/angolaGeoData';
 import { api } from '../services/apiClient';
@@ -45,6 +47,7 @@ interface MarketContextType {
   loginAsAdminDirect: (email: string, key?: string) => Promise<boolean>;
   registerUser: (userData: Partial<UserProfile> & { name: string; role: UserRole; phone: string; province: string; municipality: string }) => UserProfile;
   registerEnhancedUser: (profile: UserProfile) => UserProfile;
+  updateUserProfile: (data: Partial<UserProfile>) => void;
   addProfileToCurrentUser: (newProfile: ActorProfileType, profileSpecificData?: any) => void;
   uploadUserDocument: (userId: string, doc: Omit<UserDocument, 'id' | 'uploadDate' | 'status'>) => void;
   replaceUserDocument: (userId: string, docId: string, newFile: { fileName: string; fileSizeKb: number; fileMimeType: string }) => void;
@@ -63,6 +66,11 @@ interface MarketContextType {
   rfqs: B2BQuotationRequest[];
   disputes: DisputeRecord[];
   notifications: EcosystemNotification[];
+  favorites: string[];
+  toggleFavorite: (productId: string) => void;
+  isFavorite: (productId: string) => boolean;
+  reviews: ProductReview[];
+  getProductReviews: (productId: string) => ProductReview[];
   cart: CartItem[];
   addToCart: (product: Product, quantity?: number) => void;
   removeFromCart: (productId: string) => void;
@@ -85,6 +93,8 @@ interface MarketContextType {
   confirmDeliveryWithOtp: (orderId: string, enteredOtp: string) => { success: boolean; message: string };
   addNewProduct: (productData: Omit<Product, 'id' | 'rating' | 'reviewCount'>) => Product;
   updateProductStock: (productId: string, newStock: number) => void;
+  updateProductPrice: (productId: string, newPrice: number, b2bBulkPricing?: { minQuantity: number; pricePerUnit: number }[]) => void;
+  deleteProduct: (productId: string) => void;
   acceptFreightLoad: (loadId: string, driverId: string) => void;
   createRfq: (rfqData: Omit<B2BQuotationRequest, 'id' | 'status' | 'createdAt'>) => void;
   respondToRfq: (rfqId: string, quotedPriceAOA: number) => void;
@@ -93,6 +103,8 @@ interface MarketContextType {
   submitVerifiedReview: (productId: string, orderId: string, rating: number, comment: string) => { success: boolean; message: string };
   cancelOrderWithPolicy: (orderId: string, reason: string) => { success: boolean; message: string };
   blockSuspiciousEntity: (entityId: string, reason: string) => { success: boolean; message: string };
+  platformConfig: PlatformConfig;
+  updatePlatformConfig: (config: Partial<PlatformConfig>) => void;
   formatKz: (val: number) => string;
   markNotificationAsRead: (notifId: string) => void;
   addNotification: (title: string, message: string, type: EcosystemNotification['type']) => void;
@@ -264,7 +276,50 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    const saved = localStorage.getItem('ao_market_favorites');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [reviews, setReviews] = useState<ProductReview[]>(() => {
+    const saved = localStorage.getItem('ao_market_reviews');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [platformConfig, setPlatformConfig] = useState<PlatformConfig>(() => {
+    const saved = localStorage.getItem('ao_market_platform_config');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return {
+      escrowHoldDays: 3,
+      marketplaceCommissionPercent: 1.5,
+      disintermediationAlertsEnabled: true,
+      requireBiForHighValueTransactions: true,
+      minimumOrderValueAOA: 1000,
+      lastUpdatedBy: 'Sistema Oficial',
+      lastUpdatedAt: new Date().toISOString()
+    };
+  });
+
   const [notifications, setNotifications] = useState<EcosystemNotification[]>([]);
+
+  // Keep localStorage in sync for favorites, reviews and platformConfig
+  useEffect(() => {
+    localStorage.setItem('ao_market_favorites', JSON.stringify(favorites));
+  }, [favorites]);
+
+  useEffect(() => {
+    localStorage.setItem('ao_market_reviews', JSON.stringify(reviews));
+  }, [reviews]);
+
+  useEffect(() => {
+    localStorage.setItem('ao_market_platform_config', JSON.stringify(platformConfig));
+  }, [platformConfig]);
 
   // Sync API Client token with active user
   useEffect(() => {
@@ -389,7 +444,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         province: 'Luanda',
         municipality: 'Luanda',
         address: 'Edifício Kilamba, Eixo Viário, Luanda, Angola',
-        companyName: 'AO MARKET Governação & Supervisão S.A.',
+        companyName: 'AO MARKET Angola S.A.',
         nif: '5001928374',
         biNumber: '003928174LA042',
         isFormalized: true,
@@ -413,7 +468,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsAuthenticated(true);
     // Save admin profile to Firestore
     FirestoreSyncService.saveUser(adminUser);
-    addNotification('Consola de Supervisão Desbloqueada', `Sessão administrativa iniciada para ${adminUser.name}.`, 'SECURITY');
+    addNotification('Consola de Administração Desbloqueada', `Sessão administrativa iniciada para ${adminUser.name}.`, 'SECURITY');
     return true;
   };
 
@@ -1157,6 +1212,84 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, availableStock: newStock } : p));
   };
 
+  const updateProductPrice = (productId: string, newPrice: number, b2bBulkPricing?: { minQuantity: number; pricePerUnit: number }[]) => {
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      const ownerCheck = checkProductOwnership(currentUser, product, 'update');
+      if (!ownerCheck.allowed) {
+        addNotification('Acesso Negado (RBAC)', ownerCheck.reason || 'Não pode alterar o preço deste produto.', 'SECURITY');
+        return;
+      }
+      const updated = { 
+        ...product, 
+        price: newPrice,
+        ...(b2bBulkPricing ? { b2bBulkPricing } : {})
+      };
+      FirestoreSyncService.saveProduct(updated);
+      setProducts(prev => prev.map(p => p.id === productId ? updated : p));
+      addNotification('Preço Atualizado', `Preço de ${product.title} atualizado para ${formatKz(newPrice)}.`, 'ORDER');
+    }
+  };
+
+  const deleteProduct = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      const ownerCheck = checkProductOwnership(currentUser, product, 'delete');
+      if (!ownerCheck.allowed) {
+        addNotification('Acesso Negado (RBAC)', ownerCheck.reason || 'Não tem permissão para eliminar este produto.', 'SECURITY');
+        return;
+      }
+      setProducts(prev => prev.filter(p => p.id !== productId));
+      addNotification('Produto Removido', `O produto ${product.title} foi removido do catálogo.`, 'ORDER');
+    }
+  };
+
+  const toggleFavorite = (productId: string) => {
+    if (!isAuthenticated) {
+      addNotification('Favoritos', 'Faça login para guardar produtos nos seus favoritos.', 'SECURITY');
+      return;
+    }
+    setFavorites(prev => {
+      const exists = prev.includes(productId);
+      const updated = exists ? prev.filter(id => id !== productId) : [...prev, productId];
+      if (!exists) {
+        addNotification('Favoritos', 'Produto adicionado aos seus favoritos.', 'ORDER');
+      }
+      return updated;
+    });
+  };
+
+  const isFavorite = (productId: string): boolean => {
+    return favorites.includes(productId);
+  };
+
+  const getProductReviews = (productId: string): ProductReview[] => {
+    return reviews.filter(r => r.productId === productId);
+  };
+
+  const updateUserProfile = (data: Partial<UserProfile>) => {
+    if (!isAuthenticated) return;
+    const updated = { ...currentUser, ...data };
+    setCurrentUser(updated);
+    setRegisteredUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+    FirestoreSyncService.saveUserProfile(updated);
+    addNotification('Perfil Atualizado', 'Os seus dados de perfil foram atualizados com sucesso.', 'SECURITY');
+  };
+
+  const updatePlatformConfig = (configUpdates: Partial<PlatformConfig>) => {
+    if (currentUser.role !== 'admin') {
+      addNotification('Acesso Restrito', 'Apenas Administradores podem atualizar as configurações da plataforma.', 'SECURITY');
+      return;
+    }
+    setPlatformConfig(prev => ({
+      ...prev,
+      ...configUpdates,
+      lastUpdatedBy: currentUser.name,
+      lastUpdatedAt: new Date().toISOString()
+    }));
+    addNotification('Configurações Salvas', 'Configurações globais da plataforma atualizadas com sucesso.', 'SECURITY');
+  };
+
   const acceptFreightLoad = (loadId: string, driverId: string) => {
     const driver = registeredUsers.find(d => d.id === driverId) || currentUser;
     const driverName = driver.name || 'Transportador Autorizado';
@@ -1276,6 +1409,21 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!hasItem) {
       return { success: false, message: 'Este produto não faz parte dos itens desta encomenda.' };
     }
+
+    const newReview: ProductReview = {
+      id: `rev_${Date.now()}`,
+      productId,
+      orderId,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userProvince: currentUser.province,
+      userVerificationLevel: currentUser.verificationLevel,
+      rating,
+      comment: comment.trim(),
+      createdAt: new Date().toISOString(),
+      verifiedPurchase: true
+    };
+    setReviews(prev => [newReview, ...prev]);
 
     // Update product rating
     setProducts(prev => prev.map(p => {
@@ -1402,6 +1550,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       rfqs,
       disputes,
       notifications,
+      favorites,
+      toggleFavorite,
+      isFavorite,
+      reviews,
+      getProductReviews,
       cart,
       addToCart,
       removeFromCart,
@@ -1418,6 +1571,8 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       confirmDeliveryWithOtp,
       addNewProduct,
       updateProductStock,
+      updateProductPrice,
+      deleteProduct,
       acceptFreightLoad,
       createRfq,
       respondToRfq,
@@ -1426,6 +1581,8 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       submitVerifiedReview,
       cancelOrderWithPolicy,
       blockSuspiciousEntity,
+      platformConfig,
+      updatePlatformConfig,
       formatKz,
       markNotificationAsRead,
       addNotification,

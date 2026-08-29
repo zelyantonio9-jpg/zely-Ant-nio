@@ -128,7 +128,7 @@ export function getRoleNamePt(role: UserRole): string {
     case 'buyer':
       return 'Comprador';
     case 'admin':
-      return 'Supervisão Nacional (Admin)';
+      return 'Administrador';
     case 'support':
       return 'Suporte & Operações';
     default:

@@ -99,7 +99,7 @@ export const AdminSecretModal: React.FC<AdminSecretModalProps> = ({
           <Database className="w-4 h-4 text-[#FF6B00] shrink-0 mt-0.5" />
           <div className="space-y-1">
             <span className="font-bold text-slate-200 block">
-              Portal Restrito de Supervisão Soberana
+              Portal de Gestão & Administração
             </span>
             <p className="text-[11px] text-slate-400 leading-relaxed">
               Desbloqueado com 5 cliques no logótipo. Permite gerir utilizadores reais, validar documentação cadastral e monitorizar a base de dados Firestore em tempo real.

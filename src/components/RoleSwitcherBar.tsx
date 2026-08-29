@@ -82,8 +82,8 @@ export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({ activeTab, set
     },
     {
       id: 'admin',
-      label: 'Supervisão Nacional',
-      sub: 'Painel Administrativo',
+      label: 'Painel Admin',
+      sub: 'Administração Geral',
       icon: LayoutDashboard,
       badge: 'Admin'
     }

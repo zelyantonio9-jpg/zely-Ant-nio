@@ -39,6 +39,7 @@ interface RegistrationFlowProps {
   onSuccess: (user: UserProfile) => void;
   onCancel: () => void;
   onSwitchToLogin: () => void;
+  onOpenLegal?: (tab: 'terms' | 'privacy' | 'governance') => void;
 }
 
 type MainCategoryChoice = 'PRODUCER' | 'BUYER' | 'TRANSPORTER' | 'EMPRESA';
@@ -46,7 +47,8 @@ type MainCategoryChoice = 'PRODUCER' | 'BUYER' | 'TRANSPORTER' | 'EMPRESA';
 export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
   onSuccess,
   onCancel,
-  onSwitchToLogin
+  onSwitchToLogin,
+  onOpenLegal
 }) => {
   const { registerEnhancedUser } = useMarket();
 
@@ -1627,8 +1629,29 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
               </div>
             </div>
 
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-[11px] text-emerald-900 text-left">
-              <strong>Pronto para Ativar:</strong> A sua conta receberá imediatamente Nível {uploadedDocs.length > 0 ? 3 : 2} de Confiança Soberana com acesso instantâneo ao ecossistema nacional.
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-[11px] text-emerald-900 text-left space-y-2">
+              <div>
+                <strong>Pronto para Ativar:</strong> A sua conta receberá imediatamente Nível {uploadedDocs.length > 0 ? 3 : 2} de Confiança com acesso instantâneo ao ecossistema nacional.
+              </div>
+              <div className="text-[10px] text-slate-600 border-t border-emerald-200/80 pt-1.5 leading-snug">
+                Ao concluir a ativação, declara que aceita os{' '}
+                <button
+                  type="button"
+                  onClick={() => onOpenLegal && onOpenLegal('terms')}
+                  className="text-amber-900 font-extrabold hover:underline cursor-pointer"
+                >
+                  Termos & Condições
+                </button>{' '}
+                e a{' '}
+                <button
+                  type="button"
+                  onClick={() => onOpenLegal && onOpenLegal('privacy')}
+                  className="text-amber-900 font-extrabold hover:underline cursor-pointer"
+                >
+                  Política de Privacidade
+                </button>{' '}
+                do AO MARKET.
+              </div>
             </div>
           </div>
         )}

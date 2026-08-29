@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { MarketProvider, useMarket } from './context/MarketContext';
 import { Header } from './components/Header';
-import { RoleSwitcherBar } from './components/RoleSwitcherBar';
 import { HomePageView } from './components/HomePageView';
 import { MarketplaceView } from './components/MarketplaceView';
 import { ProducerPortal } from './components/ProducerPortal';
@@ -19,9 +18,10 @@ import { ArchitectureDocModal } from './components/ArchitectureDocModal';
 import { DocumentVerificationCenter } from './components/DocumentVerificationCenter';
 import { CompanyTeamManagement } from './components/CompanyTeamManagement';
 import { SecurityAuditorModal } from './components/SecurityAuditorModal';
-import { EcosystemRulesModal } from './components/EcosystemRulesModal';
+import { LegalAndGovernanceModal, LegalDocTab } from './components/LegalAndGovernanceModal';
 import { RestrictedAccessView } from './components/RestrictedAccessView';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { Footer } from './components/Footer';
 import { isTabAllowedForRole, getDefaultTabForRole } from './utils/rolePermissions';
 import { Logo } from './components/Logo';
 import { Order } from './types';
@@ -41,11 +41,17 @@ const MainAppContent: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isArchitectureOpen, setIsArchitectureOpen] = useState(false);
-  const [isRulesOpen, setIsRulesOpen] = useState(false);
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<LegalDocTab>('terms');
   const [isDocCenterOpen, setIsDocCenterOpen] = useState(false);
   const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
   const [isSecurityAuditorOpen, setIsSecurityAuditorOpen] = useState(false);
   const [trackedOrder, setTrackedOrder] = useState<Order | null>(null);
+
+  const handleOpenLegal = (tab: LegalDocTab = 'terms') => {
+    setLegalModalTab(tab);
+    setIsLegalModalOpen(true);
+  };
 
   // Active tracking order (only for authenticated user who is involved in the order or admin)
   const activeInTransitOrder = isAuthenticated 
@@ -72,7 +78,7 @@ const MainAppContent: React.FC = () => {
         onOpenAssistant={() => setIsAssistantOpen(true)}
         onOpenArchitecture={() => setIsArchitectureOpen(true)}
         onOpenAuth={handleOpenAuth}
-        onOpenRules={() => setIsRulesOpen(true)}
+        onOpenRules={() => handleOpenLegal('governance')}
         onOpenDocCenter={() => setIsDocCenterOpen(true)}
         onOpenTeamManagement={() => setIsTeamManagementOpen(true)}
         onOpenSecurityAuditor={currentUser.role === 'admin' ? () => setIsSecurityAuditorOpen(true) : undefined}
@@ -81,13 +87,6 @@ const MainAppContent: React.FC = () => {
         setSearchQuery={setSearchQuery}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-      />
-
-      {/* Role and Ecosystem Pillar Switcher */}
-      <RoleSwitcherBar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onOpenSecurityAuditor={currentUser.role === 'admin' ? () => setIsSecurityAuditorOpen(true) : undefined}
       />
 
       {/* Active Trip / Delivery Quick Status Bar (Floating Context) */}
@@ -126,7 +125,7 @@ const MainAppContent: React.FC = () => {
             onOpenAuth={handleOpenAuth}
             onOpenCart={() => setIsCartOpen(true)}
             onOpenAssistant={() => setIsAssistantOpen(true)}
-            onOpenRules={() => setIsRulesOpen(true)}
+            onOpenRules={() => handleOpenLegal('governance')}
           />
         )}
 
@@ -216,6 +215,7 @@ const MainAppContent: React.FC = () => {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         initialMode={authModalMode}
+        onOpenLegal={handleOpenLegal}
         onSuccess={() => {
           setTimeout(() => {
             const saved = localStorage.getItem('ao_market_current_user');
@@ -242,6 +242,7 @@ const MainAppContent: React.FC = () => {
       <CartAndCheckoutModal
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
+        onOpenLegal={handleOpenLegal}
         onOrderCreated={(order) => setTrackedOrder(order)}
       />
 
@@ -265,10 +266,11 @@ const MainAppContent: React.FC = () => {
         onClose={() => setIsArchitectureOpen(false)}
       />
 
-      {/* Official Ecosystem Rules Modal (14 Regras e Regra Central) */}
-      <EcosystemRulesModal
-        isOpen={isRulesOpen}
-        onClose={() => setIsRulesOpen(false)}
+      {/* Official Legal & Ecosystem Governance Modal (Termos, Privacidade e 14 Regras) */}
+      <LegalAndGovernanceModal
+        isOpen={isLegalModalOpen}
+        onClose={() => setIsLegalModalOpen(false)}
+        initialTab={legalModalTab}
       />
 
       {/* Document Verification & Trust Center Modal */}
@@ -311,117 +313,14 @@ const MainAppContent: React.FC = () => {
       </button>
 
       {/* Comprehensive Sovereign Angolan Ecosystem Footer */}
-      <footer className="bg-[#0b101c] border-t border-[#1e293b] text-[#94a3b8] text-xs py-10 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-8 border-b border-[#1e293b]">
-            {/* Column 1 */}
-            <div className="space-y-3">
-              <Logo 
-                variant="footer" 
-                onClick={() => setActiveTab('home')}
-                onSecretAdminTrigger={() => setIsAdminSecretModalOpen(true)} 
-              />
-              <p className="text-[#94a3b8] text-xs leading-relaxed pt-1">
-                Plataforma oficial que estrutura o escoamento agro-industrial da República de Angola: conectando cooperativas, transportadores rodoviários certificados e centrais de distribuição com custódia regulada e proteção social.
-              </p>
-              {currentUser.role === 'admin' && (
-                <div className="pt-2">
-                  <button
-                    onClick={() => setIsSecurityAuditorOpen(true)}
-                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 text-[11px] font-bold border border-slate-700 transition cursor-pointer"
-                  >
-                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Auditoria de Segurança & RBAC (3 Níveis)</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Column 2 */}
-            <div className="space-y-2.5">
-              <span className="font-bold text-white uppercase tracking-wider text-[11px] block">
-                Pilares do Ecossistema
-              </span>
-              <ul className="space-y-2 text-[#94a3b8]">
-                <li><button onClick={() => setActiveTab('marketplace')} className="hover:text-white transition">Catálogo Nacional de Produtos</button></li>
-                <li><button onClick={() => setActiveTab('producer')} className="hover:text-white transition">Registo de Colheitas & Produtores</button></li>
-                <li><button onClick={() => setActiveTab('merchant')} className="hover:text-white transition">Cotações Grossistas (RFQ)</button></li>
-                <li><button onClick={() => setActiveTab('logistics')} className="hover:text-white transition">Bolsa de Fretes AO Logistics</button></li>
-                <li><button onClick={() => setActiveTab('social_protection')} className="hover:text-white transition">Proteção Social & INSS</button></li>
-                <li><button onClick={() => setActiveTab('disputes')} className="hover:text-white transition">Mediação Segura AO Protect</button></li>
-              </ul>
-            </div>
-
-            {/* Column 3 */}
-            <div className="space-y-2.5">
-              <span className="font-bold text-white uppercase tracking-wider text-[11px] block">
-                Garantias & Conformidade
-              </span>
-              <ul className="space-y-2 text-[#94a3b8]">
-                <li className="flex items-center space-x-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Custódia Regulada (BNA / EMIS)</span>
-                </li>
-                <li className="flex items-center space-x-1.5">
-                  <Truck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>Rastreio de Frota Nacional</span>
-                </li>
-                <li className="flex items-center space-x-1.5">
-                  <Award className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Registo Oficial no INSS</span>
-                </li>
-                <li className="flex items-center space-x-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span>Validação de NIF com AGT</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Column 4 */}
-            <div className="space-y-3">
-              <span className="font-bold text-white uppercase tracking-wider text-[11px] block">
-                Cobertura Territorial
-              </span>
-              <p className="text-[#94a3b8] text-xs">
-                Operação ativa em 21 províncias e 326 municípios com rotas rodoviárias integradas (DPA).
-              </p>
-              <div className="p-3 bg-[#050914] rounded-xl border border-[#1e293b] space-y-1">
-                <div className="text-[11px] text-white font-semibold flex items-center justify-between">
-                  <span>Conexão Cloud Firebase</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono">
-                  Sincronização em Tempo Real Ativa
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Copyright & Disclaimer */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-[#64748b] text-[11px]">
-            <div>
-              © 2026 AO MARKET — República de Angola. Plataforma Nacional de Comércio Agro-Industrial e Logística Rodoviária.
-            </div>
-            <div className="flex items-center space-x-4">
-              <span>Luanda • Huambo • Benguela • Huíla</span>
-              <span>•</span>
-              <button 
-                onClick={() => setIsRulesOpen(true)}
-                className="text-emerald-400 hover:text-emerald-300 underline font-semibold cursor-pointer"
-              >
-                Regras & Governação (14 Regras)
-              </button>
-              <span>•</span>
-              <button 
-                onClick={() => setIsArchitectureOpen(true)}
-                className="text-[#94a3b8] hover:text-white underline cursor-pointer"
-              >
-                Manual de Arquitetura Soberana
-              </button>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer
+        onNavigate={setActiveTab}
+        onOpenAuth={handleOpenAuth}
+        onOpenAssistant={() => setIsAssistantOpen(true)}
+        onOpenLegal={handleOpenLegal}
+        onOpenCart={() => setIsCartOpen(true)}
+        onOpenAdminSecretModal={() => setIsAdminSecretModalOpen(true)}
+      />
 
       {/* Mobile Bottom Bar for native app-like UX on small screens */}
       <MobileBottomNav
@@ -429,7 +328,7 @@ const MainAppContent: React.FC = () => {
         setActiveTab={setActiveTab}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenAssistant={() => setIsAssistantOpen(true)}
-        onOpenRules={() => setIsRulesOpen(true)}
+        onOpenRules={() => handleOpenLegal('governance')}
       />
     </div>
   );

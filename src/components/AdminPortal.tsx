@@ -176,8 +176,8 @@ export const AdminPortal: React.FC = () => {
 
   const handleEscalateCase = () => {
     if (!selectedUserForDetail) return;
-    addAuditLog(selectedUserForDetail.id, 'Caso Encaminhado para a Direção / Administração', 'Encaminhamento efetuado pelo operador de suporte para validação superior.');
-    updateAccountStatus(selectedUserForDetail.id, 'EM_ANALISE', 'Encaminhado para parecer da Direção.');
+    addAuditLog(selectedUserForDetail.id, 'Caso Encaminhado para a Administração', 'Encaminhamento efetuado pelo operador de suporte para validação superior.');
+    updateAccountStatus(selectedUserForDetail.id, 'EM_ANALISE', 'Encaminhado para parecer da Administração.');
   };
 
   return (
@@ -192,7 +192,7 @@ export const AdminPortal: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base sm:text-lg font-display font-bold text-slate-900">
-                {isSupportRole ? 'Painel de Suporte e Operações' : 'Supervisão Geral do AO MARKET'}
+                {isSupportRole ? 'Painel de Suporte e Operações' : 'Administração do AO MARKET'}
               </h1>
               <span className={`text-[10px] px-2.5 py-0.5 rounded-md font-semibold ${isSupportRole ? 'bg-blue-50 text-blue-800 border border-blue-200' : 'bg-slate-100 text-slate-800 border border-slate-200'}`}>
                 {isSupportRole ? 'Suporte' : 'Administração'}

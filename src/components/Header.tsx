@@ -5,7 +5,7 @@ import {
   User, 
   MessageSquare, 
   ChevronDown, 
-  MapPin, 
+  MapPin,
   FileDown, 
   FileText,
   ShieldCheck,
@@ -341,8 +341,25 @@ export const Header: React.FC<HeaderProps> = ({
 
         </div>
 
-        {/* 2. Search Bar Row matching reference image */}
-        <div className="mt-3 flex items-center gap-3">
+        {/* 2. Search Bar Row with Province Selector matching reference design */}
+        <div className="mt-3 flex items-center gap-2 sm:gap-3">
+          {/* Province Selector for Desktop / Tablet */}
+          <div className="hidden sm:flex items-center space-x-1.5 bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-2 text-xs text-slate-700 font-medium shrink-0 transition shadow-2xs">
+            <MapPin className="w-3.5 h-3.5 text-[#FF6B00] shrink-0" />
+            <select
+              id="province-selector-header"
+              value={selectedProvince}
+              onChange={(e) => setSelectedProvince(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-hidden cursor-pointer max-w-[140px] md:max-w-[180px] truncate"
+              title="Filtrar produtos por província de Angola"
+            >
+              <option value="todas">Angola (Todas as Províncias)</option>
+              {ANGOLA_PROVINCES.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
           <form 
             onSubmit={handleSearchSubmit}
             className="flex-1 relative flex items-center bg-white border border-slate-200 hover:border-slate-300 focus-within:border-slate-400 rounded-lg transition px-3.5 py-2 shadow-2xs"
@@ -422,18 +439,19 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Province Selector for Mobile */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1">
+            <div className="space-y-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-200">
+              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center space-x-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#FF6B00]" />
-                <span>Filtrar por Província</span>
+                <span>Filtrar por Província (Angola)</span>
               </label>
               <select
+                id="mobile-province-select"
                 value={selectedProvince}
                 onChange={(e) => {
                   setSelectedProvince(e.target.value);
                   setMobileMenuOpen(false);
                 }}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-hidden"
               >
                 <option value="todas">Angola (Todas as 21 Províncias / 326 Municípios)</option>
                 {ANGOLA_PROVINCES.map((p) => (

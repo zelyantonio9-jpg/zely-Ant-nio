@@ -21,12 +21,14 @@ interface CartAndCheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOrderCreated: (order: Order) => void;
+  onOpenLegal?: (tab: 'terms' | 'privacy' | 'governance') => void;
 }
 
 export const CartAndCheckoutModal: React.FC<CartAndCheckoutModalProps> = ({
   isOpen,
   onClose,
-  onOrderCreated
+  onOrderCreated,
+  onOpenLegal
 }) => {
   const { 
     cart, 
@@ -345,6 +347,34 @@ export const CartAndCheckoutModal: React.FC<CartAndCheckoutModalProps> = ({
                 <span>Total a Pagar:</span>
                 <span className="text-amber-800 font-mono">{formatKz(totalAmount)}</span>
               </div>
+            </div>
+
+            <div className="text-[10px] text-slate-500 text-center px-2">
+              Ao confirmar o pagamento, aceita os{' '}
+              <button
+                type="button"
+                onClick={() => onOpenLegal && onOpenLegal('terms')}
+                className="text-amber-900 font-bold hover:underline cursor-pointer"
+              >
+                Termos de Uso
+              </button>
+              , a{' '}
+              <button
+                type="button"
+                onClick={() => onOpenLegal && onOpenLegal('privacy')}
+                className="text-amber-900 font-bold hover:underline cursor-pointer"
+              >
+                Política de Privacidade
+              </button>{' '}
+              e as{' '}
+              <button
+                type="button"
+                onClick={() => onOpenLegal && onOpenLegal('governance')}
+                className="text-amber-900 font-bold hover:underline cursor-pointer"
+              >
+                Regras de Custódia
+              </button>{' '}
+              do AO MARKET.
             </div>
 
             {/* Form Footer */}

@@ -49,11 +49,11 @@ export const ECOSYSTEM_TABS: Record<TabId, TabConfig> = {
   merchant: {
     id: 'merchant',
     label: 'Portal do Comerciante & Grossista',
-    shortLabel: 'Grossista & RFQ',
-    description: 'Cotações em grande escala (RFQ) e compras institucionais B2B',
+    shortLabel: 'Comerciante & Vendas',
+    description: 'Publicação de produtos de armazém/loja, gestão de vendas, cotações em grande escala (RFQ) e B2B',
     allowedRoles: ['merchant', 'admin'],
     requiresAuth: true,
-    roleSpecificNotice: 'Área exclusiva para Comerciantes Grossistas, Centrais de Compras e Distribuidores.'
+    roleSpecificNotice: 'Área exclusiva para Comerciantes, Grossistas, Lojas, Armazenistas e Distribuidores.'
   },
   logistics: {
     id: 'logistics',

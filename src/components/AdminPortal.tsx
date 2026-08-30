@@ -37,9 +37,11 @@ import {
   DocumentVerificationStatus, 
   VerificationLevel,
   AccountRegistrationStatus,
-  ActorProfileType
+  ActorProfileType,
+  FormalizationStageStatus
 } from '../types';
 import { getAccountStatusBadge } from '../utils/rolePermissions';
+import { FormalizationAdminPortal } from './FormalizationAdminPortal';
 
 export const AdminPortal: React.FC = () => {
   const { 
@@ -56,11 +58,18 @@ export const AdminPortal: React.FC = () => {
     requestAdditionalDocuments,
     addAuditLog,
     resetToOfficialData,
-    clearAllTransactions 
+    clearAllTransactions,
+    formalizationDossiers,
+    formalizationDocuments,
+    formalizationAuditLogs,
+    approveFormalizationDoc,
+    rejectFormalizationDoc,
+    advanceFormalizationStage,
+    validateFormalizationINSS
   } = useMarket();
 
   // Admin / Support tab navigation
-  const [adminTab, setAdminTab] = useState<'ENTITIES' | 'DOCUMENT_QUEUE' | 'AUDIT_LOGS'>('ENTITIES');
+  const [adminTab, setAdminTab] = useState<'ENTITIES' | 'DOCUMENT_QUEUE' | 'FORMALIZATION' | 'AUDIT_LOGS'>('FORMALIZATION');
   
   // Detail Modal
   const [selectedUserForDetail, setSelectedUserForDetail] = useState<UserProfile | null>(null);
@@ -341,6 +350,19 @@ export const AdminPortal: React.FC = () => {
       <div className="flex items-center space-x-2 border-b border-slate-200 pb-2">
         <button
           type="button"
+          onClick={() => setAdminTab('FORMALIZATION')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+            adminTab === 'FORMALIZATION'
+              ? 'bg-[#FF6B00] text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Building2 className="w-3.5 h-3.5" />
+          <span>Gestão de Formalização PREI ({formalizationDossiers.length})</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setAdminTab('ENTITIES')}
           className={`px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
             adminTab === 'ENTITIES'
@@ -363,6 +385,24 @@ export const AdminPortal: React.FC = () => {
           Fila de Validação Documental ({pendingDocs.length})
         </button>
       </div>
+
+      {/* TAB 0: FORMALIZATION DOSSIERS PREI */}
+      {adminTab === 'FORMALIZATION' && (
+        <FormalizationAdminPortal
+          currentUser={currentUser}
+          dossiers={formalizationDossiers}
+          documents={formalizationDocuments}
+          auditLogs={formalizationAuditLogs}
+          onApproveDocument={approveFormalizationDoc}
+          onRejectDocument={rejectFormalizationDoc}
+          onAdvanceStage={(dossierId: string, newStage: FormalizationStageStatus, notes: string) => 
+            advanceFormalizationStage(dossierId, newStage, notes)
+          }
+          onAssignAgent={(_dossierId: string, _agentId: string, _agentName: string) => {}}
+          onValidateINSSRecord={validateFormalizationINSS}
+          onClose={() => setAdminTab('ENTITIES')}
+        />
+      )}
 
       {/* TAB 1: ENTITIES DIRECTORY */}
       {adminTab === 'ENTITIES' && (

@@ -1,4 +1,23 @@
-import { INSSValidationResult, INSSAuditLog, INSSComplianceStatus, INSSRegimeType, UserProfile } from '../types';
+import { 
+  INSSValidationResult, 
+  INSSAuditLog, 
+  INSSComplianceStatus, 
+  INSSRegimeType, 
+  UserProfile,
+  INSSVerificationRecord 
+} from '../types';
+
+/**
+ * Interface Oficial para Integração Futura com o Instituto Nacional de Segurança Social (INSS Angola)
+ * Preparada para integração via Webhook / REST Soberano ou Validação Manual por Agente Autorizado
+ */
+export interface INSSIntegrationAdapter {
+  queryNISS(niss: string, requesterUserId: string, requesterRole: string): Promise<INSSValidationResult>;
+  queryNIF(nif: string, requesterUserId: string, requesterRole: string): Promise<INSSValidationResult>;
+  validateCertificate(certificateCode: string, requesterUserId: string): Promise<INSSValidationResult>;
+  submitManualVerificationRecord(record: Omit<INSSVerificationRecord, 'id' | 'createdAt'>): Promise<INSSVerificationRecord>;
+  checkProcessStatus(protocolOrRef: string): Promise<{ status: string; stage: string; lastUpdate: string; message: string }>;
+}
 
 /**
  * INSTITUTO NACIONAL DE SEGURANÇA SOCIAL (INSS) - REPÚBLICA DE ANGOLA

@@ -54,6 +54,38 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Formalization Program Collections
+    match /formalization_dossiers/{dossierId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /formalization_stages/{stageId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /formalization_documents/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /institutional_referrals/{referralId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /inss_verifications/{verificationId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /formalization_audit_logs/{logId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+
     // Default fallback
     match /{document=**} {
       allow read, write: if true;

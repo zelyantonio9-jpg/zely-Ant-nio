@@ -8,7 +8,9 @@ export type UserRole =
   | 'admin'
   | 'support'
   | 'company_admin'
-  | 'company_user';
+  | 'company_user'
+  | 'formalization_agent'
+  | 'inss_auditor';
 
 export type PermissionAction = 
   // Products
@@ -72,7 +74,15 @@ export type PermissionAction =
   // INSS Integration
   | 'inss:validate'
   | 'inss:link'
-  | 'inss:audit_read';
+  | 'inss:audit_read'
+  // Formalization Program
+  | 'formalization:read'
+  | 'formalization:create'
+  | 'formalization:update'
+  | 'formalization:approve'
+  | 'formalization:reject'
+  | 'formalization:refer'
+  | 'formalization:audit';
 
 export type EntityType = 'PESSOA_SINGULAR' | 'EMPRESA' | 'COOPERATIVA' | 'ASSOCIACAO';
 
@@ -290,6 +300,171 @@ export interface TrustVerificationBadge {
   issuedAt: string;
 }
 
+// ==========================================
+// PROGRAMA DE FORMALIZAÇÃO DE NEGÓCIOS INFORMAIS
+// ==========================================
+
+export type FormalizationStageStatus = 
+  | 'INFORMAL_REGISTADO'
+  | 'DIAGNOSTICO_CONCLUIDO'
+  | 'DOCUMENTOS_PENDENTES'
+  | 'DOCUMENTOS_SUBMETIDOS'
+  | 'EM_ANALISE'
+  | 'PENDENTE_CORRECAO'
+  | 'ENCAMINHADO_AGT'
+  | 'NIF_EM_PROCESSAMENTO'
+  | 'NIF_EMITIDO'
+  | 'ENCAMINHADO_INSS'
+  | 'INSS_EM_PROCESSAMENTO'
+  | 'INSS_VINCULADO'
+  | 'FORMALIZACAO_CONCLUIDA';
+
+export type InformalActivityType = 
+  | 'VENDEDOR_PRACA_MERCADO'
+  | 'AGRICULTOR_FAMILIAR'
+  | 'PESCADOR_ARTESANAL'
+  | 'KUPAPATA_MOTORISTA_LOCAL'
+  | 'ARTESAO_MANUAL'
+  | 'PRESTADOR_SERVICOS_AUTONOMO'
+  | 'COMERCIANTE_AMBULANTE'
+  | 'PEQUENA_OFICINA_TRANSFORMACAO'
+  | 'OUTRO_INFORMAL';
+
+export interface FormalizationDocument {
+  id: string;
+  dossierId: string;
+  userId: string;
+  documentType: DocumentTypeEnum | 'DECLARACAO_ATIVIDADE' | 'FICHA_PREI' | 'GUIA_INSS';
+  title: string;
+  fileUrl?: string;
+  fileName: string;
+  fileSizeKb: number;
+  fileMimeType: string;
+  status: DocumentVerificationStatus;
+  rejectionReason?: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewedByName?: string;
+  verifiedOfficialReference?: string;
+}
+
+export interface FormalizationStage {
+  id: string;
+  dossierId: string;
+  stageCode: FormalizationStageStatus;
+  stageName: string;
+  institutionResponsible: 'AO_MARKET' | 'AGT' | 'INSS' | 'ADMINISTRACAO_MUNICIPAL' | 'GUICHE_UNICO' | 'BANCARIA';
+  status: 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDO' | 'BLOQUEADO' | 'REJEITADO';
+  startedAt?: string;
+  completedAt?: string;
+  completedBy?: string;
+  notes?: string;
+  requiredDocuments: string[];
+  submittedDocuments: string[];
+}
+
+export interface InstitutionalReferral {
+  id: string;
+  dossierId: string;
+  userId: string;
+  targetInstitution: 'AGT' | 'INSS' | 'PREI_GUICHE_UNICO' | 'BANCO_COMERCIAL' | 'ADMINISTRACAO_MUNICIPAL';
+  referralCode: string;
+  status: 'GERADO' | 'ENCAMINHADO' | 'EM_ATENDIMENTO' | 'CONCLUIDO' | 'RECUSADO';
+  protocolNumber?: string;
+  contactPerson?: string;
+  notes?: string;
+  generatedAt: string;
+  forwardedAt?: string;
+  completedAt?: string;
+  assignedAgentId?: string;
+  assignedAgentName?: string;
+}
+
+export interface INSSVerificationRecord {
+  id: string;
+  dossierId: string;
+  userId: string;
+  nif: string;
+  niss?: string;
+  officialEntityName?: string;
+  regimeType: INSSRegimeType;
+  verificationMethod: 'MANUAL_COMPROVATIVO' | 'API_OFICIAL_INSS_GOV_AO' | 'GUICHE_PRESENCIAL';
+  documentProofUrl?: string;
+  documentProofName?: string;
+  status: 'AGUARDANDO_VALIDACAO_INSTITUCIONAL' | 'VALIDADO_OFICIAL' | 'REJEITADO' | 'PENDENTE_COMPROVATIVO';
+  officialReferenceCode?: string;
+  verifiedByAgentId?: string;
+  verifiedByAgentName?: string;
+  verifiedAt?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface FormalizationAuditLog {
+  id: string;
+  dossierId: string;
+  userId: string;
+  actorId: string;
+  actorName: string;
+  actorRole: string;
+  action: 
+    | 'DOSSIER_CRIADO'
+    | 'DIAGNOSTICO_SUBMETIDO'
+    | 'DOCUMENTO_ENVIADO'
+    | 'DOCUMENTO_APROVADO'
+    | 'DOCUMENTO_REJEITADO'
+    | 'ETAPA_AVANCADA'
+    | 'ENCAMINHAMENTO_INSTITUCIONAL'
+    | 'NIF_ATRIBUIDO'
+    | 'INSS_VERIFICADO'
+    | 'FORMALIZACAO_FINALIZADA'
+    | 'CORRECAO_SOLICITADA';
+  previousState?: FormalizationStageStatus;
+  newState?: FormalizationStageStatus;
+  reason?: string;
+  details?: Record<string, any>;
+  timestamp: string;
+  ipAddress?: string;
+}
+
+export interface FormalizationDossier {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhone: string;
+  userEmail?: string;
+  activityType: InformalActivityType;
+  activityDescription?: string;
+  marketLocation?: string; // ex: "Mercado do Kikolo, Bancada 45"
+  province: string;
+  municipality: string;
+  commune?: string;
+  currentVerificationLevel: VerificationLevel;
+  status: FormalizationStageStatus;
+  progressPercentage: number; // 0 to 100
+  hasNif: boolean;
+  nifNumber?: string;
+  hasBi: boolean;
+  biNumber?: string;
+  hasInss: boolean;
+  inssNumber?: string;
+  worksAlone: boolean;
+  helpersCount: number;
+  currentInstitution: 'AO_MARKET' | 'AGT' | 'INSS' | 'ADMINISTRACAO_MUNICIPAL' | 'GUICHE_UNICO';
+  assignedAgentId?: string;
+  assignedAgentName?: string;
+  requiredDocuments: DocumentTypeEnum[];
+  submittedDocumentsCount: number;
+  approvedDocumentsCount: number;
+  pendingCorrectionCount: number;
+  createdAt: string;
+  updatedAt: string;
+  lastDiagnosisAt?: string;
+  estimatedCompletionDate?: string;
+  completedAt?: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -316,6 +491,11 @@ export interface UserProfile {
   // Formalization & INSS
   isFormalized: boolean;
   formalizationStatus?: FormalizationOption;
+  formalizationDossierId?: string;
+  formalizationStage?: FormalizationStageStatus;
+  informalActivityType?: InformalActivityType;
+  marketPlaceLocation?: string;
+  preiRegistrationNumber?: string;
   inssNumber?: string;
   inssEnrollmentStatus?: InssOption;
   inssVerified?: boolean;

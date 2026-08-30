@@ -118,6 +118,114 @@
         "decision": { "type": "string", "description": "SUCCESS, DENIED, BLOCKED_READ_ONLY" },
         "notes": { "type": "string", "description": "Auditor notes" }
       }
+    },
+    "FormalizationDossier": {
+      "collection": "formalization_dossiers",
+      "fields": {
+        "id": { "type": "string", "description": "Unique dossier ID" },
+        "userId": { "type": "string", "description": "User account ID" },
+        "userName": { "type": "string", "description": "Applicant full name" },
+        "userPhone": { "type": "string", "description": "Contact phone" },
+        "userEmail": { "type": "string", "description": "Contact email" },
+        "activityType": { "type": "string", "description": "Informal activity category" },
+        "activityDescription": { "type": "string", "description": "Description of business" },
+        "marketLocation": { "type": "string", "description": "Market or trade post location" },
+        "province": { "type": "string", "description": "Province" },
+        "municipality": { "type": "string", "description": "Municipality" },
+        "currentVerificationLevel": { "type": "number", "description": "Tier 1 to 5" },
+        "status": { "type": "string", "description": "Formalization lifecycle state" },
+        "progressPercentage": { "type": "number", "description": "0-100 progress indicator" },
+        "hasNif": { "type": "boolean", "description": "Whether applicant possesses NIF" },
+        "nifNumber": { "type": "string", "description": "Tax Identification Number" },
+        "hasBi": { "type": "boolean", "description": "Whether applicant possesses National Identity Card" },
+        "biNumber": { "type": "string", "description": "BI number" },
+        "hasInss": { "type": "boolean", "description": "Whether applicant possesses INSS registration" },
+        "inssNumber": { "type": "string", "description": "NISS number" },
+        "worksAlone": { "type": "boolean", "description": "Sole proprietor / individual operator" },
+        "helpersCount": { "type": "number", "description": "Number of workers or family helpers" },
+        "currentInstitution": { "type": "string", "description": "Current processing institution" },
+        "assignedAgentId": { "type": "string", "description": "Assigned formalization agent ID" },
+        "assignedAgentName": { "type": "string", "description": "Assigned agent name" },
+        "submittedDocumentsCount": { "type": "number", "description": "Total uploaded documents" },
+        "approvedDocumentsCount": { "type": "number", "description": "Validated documents count" },
+        "createdAt": { "type": "string", "description": "Dossier creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      }
+    },
+    "FormalizationStage": {
+      "collection": "formalization_stages",
+      "fields": {
+        "id": { "type": "string", "description": "Stage record ID" },
+        "dossierId": { "type": "string", "description": "Parent dossier ID" },
+        "stageCode": { "type": "string", "description": "Stage lifecycle enum" },
+        "stageName": { "type": "string", "description": "Readable stage name" },
+        "institutionResponsible": { "type": "string", "description": "Responsible entity" },
+        "status": { "type": "string", "description": "Stage status (PENDENTE, CONCLUIDO, etc.)" },
+        "startedAt": { "type": "string", "description": "Stage start date" },
+        "completedAt": { "type": "string", "description": "Stage completion date" },
+        "notes": { "type": "string", "description": "Stage audit notes" }
+      }
+    },
+    "FormalizationDocument": {
+      "collection": "formalization_documents",
+      "fields": {
+        "id": { "type": "string", "description": "Document ID" },
+        "dossierId": { "type": "string", "description": "Parent dossier ID" },
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "documentType": { "type": "string", "description": "BI, NIF, ALVARA, etc." },
+        "title": { "type": "string", "description": "Document title" },
+        "fileName": { "type": "string", "description": "Uploaded file name" },
+        "fileSizeKb": { "type": "number", "description": "File size in KB" },
+        "status": { "type": "string", "description": "Document verification status" },
+        "submittedAt": { "type": "string", "description": "Upload timestamp" },
+        "reviewedAt": { "type": "string", "description": "Review timestamp" },
+        "reviewedBy": { "type": "string", "description": "Reviewer agent ID" },
+        "rejectionReason": { "type": "string", "description": "Reason if rejected" }
+      }
+    },
+    "InstitutionalReferral": {
+      "collection": "institutional_referrals",
+      "fields": {
+        "id": { "type": "string", "description": "Referral record ID" },
+        "dossierId": { "type": "string", "description": "Dossier ID" },
+        "userId": { "type": "string", "description": "User ID" },
+        "targetInstitution": { "type": "string", "description": "AGT, INSS, PREI, etc." },
+        "referralCode": { "type": "string", "description": "Unique protocol/referral code" },
+        "status": { "type": "string", "description": "Referral status" },
+        "generatedAt": { "type": "string", "description": "Dispatch timestamp" },
+        "forwardedAt": { "type": "string", "description": "Official forwarding timestamp" }
+      }
+    },
+    "INSSVerification": {
+      "collection": "inss_verifications",
+      "fields": {
+        "id": { "type": "string", "description": "INSS verification record ID" },
+        "dossierId": { "type": "string", "description": "Dossier ID" },
+        "userId": { "type": "string", "description": "User ID" },
+        "nif": { "type": "string", "description": "NIF" },
+        "niss": { "type": "string", "description": "NISS" },
+        "regimeType": { "type": "string", "description": "INSS regime" },
+        "verificationMethod": { "type": "string", "description": "Verification method" },
+        "status": { "type": "string", "description": "Status" },
+        "officialReferenceCode": { "type": "string", "description": "Institutional reference code" },
+        "verifiedAt": { "type": "string", "description": "Verification timestamp" }
+      }
+    },
+    "FormalizationAuditLog": {
+      "collection": "formalization_audit_logs",
+      "fields": {
+        "id": { "type": "string", "description": "Audit log entry ID" },
+        "dossierId": { "type": "string", "description": "Dossier ID" },
+        "userId": { "type": "string", "description": "Subject user ID" },
+        "actorId": { "type": "string", "description": "Action performer ID" },
+        "actorName": { "type": "string", "description": "Performer name" },
+        "actorRole": { "type": "string", "description": "Performer role" },
+        "action": { "type": "string", "description": "Audit action type" },
+        "previousState": { "type": "string", "description": "State prior to event" },
+        "newState": { "type": "string", "description": "State after event" },
+        "reason": { "type": "string", "description": "Audit reason or notes" },
+        "timestamp": { "type": "string", "description": "Event timestamp" }
+      }
     }
   }
 }

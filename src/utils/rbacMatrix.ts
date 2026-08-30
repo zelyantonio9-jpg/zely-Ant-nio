@@ -217,7 +217,44 @@ export const ROLE_PERMISSIONS_MATRIX: Record<UserRole, PermissionAction[]> = {
     'disputes:resolve',
     'inss:validate',
     'inss:link',
-    'inss:audit_read'
+    'inss:audit_read',
+    'formalization:read',
+    'formalization:create',
+    'formalization:update',
+    'formalization:approve',
+    'formalization:reject',
+    'formalization:refer',
+    'formalization:audit'
+  ],
+
+  formalization_agent: [
+    'users:read',
+    'documents:read',
+    'documents:approve',
+    'documents:reject',
+    'formalization:read',
+    'formalization:create',
+    'formalization:update',
+    'formalization:approve',
+    'formalization:reject',
+    'formalization:refer',
+    'formalization:audit',
+    'inss:validate',
+    'inss:link',
+    'inss:audit_read',
+    'chats:read',
+    'chats:send'
+  ],
+
+  inss_auditor: [
+    'users:read',
+    'documents:read',
+    'formalization:read',
+    'formalization:audit',
+    'inss:validate',
+    'inss:link',
+    'inss:audit_read',
+    'system:view_audit_logs'
   ]
 };
 
@@ -319,6 +356,39 @@ export const OFFICIAL_PERSONA_PROFILES = [
     prohibitedActions: [
       'Alterar dados do INSS diretamente (Read-Only Governamental)',
       'Executar ações sem registo no log de auditoria imutável'
+    ]
+  },
+  {
+    role: 'formalization_agent' as UserRole,
+    title: 'Agente de Formalização AO MARKET',
+    description: 'Acompanha o processo de saída da informalidade, analisa dossiês, valida comprovativos, apoia emissão de NIF junto da AGT e encaminhamento para Segurança Social (INSS/PREI).',
+    coreActions: [
+      'Analisar dossiês de formalização de negócios informais',
+      'Validar documentos (BI, declaração de atividade, guias)',
+      'Solicitar correções e esclarecimentos a empreendedores',
+      'Avançar etapas do dossiê institucional',
+      'Emitir guias e códigos de encaminhamento institucional',
+      'Registar auditoria imutável de todas as decisões tomadas'
+    ],
+    prohibitedActions: [
+      'Forjar certidões ou comprovativos governamentais',
+      'Alterar produtos ou realizar compras no marketplace',
+      'Alterar permissões de utilizadores administradores'
+    ]
+  },
+  {
+    role: 'inss_auditor' as UserRole,
+    title: 'Auditor Governamental / INSS',
+    description: 'Audita conformidade previdenciária e contributiva, valida certidões e comprovativos de inscrição, e inspeciona trilhas de auditoria institucional.',
+    coreActions: [
+      'Verificar regularidade contributiva e inscrições no INSS',
+      'Validar comprovativos e certidões de não devedor',
+      'Consultar trilhas de auditoria e verificação institucional',
+      'Emitir relatórios de conformidade da segurança social'
+    ],
+    prohibitedActions: [
+      'Modificar dados cadastrais de produtos ou encomendas',
+      'Efetuar operações financeiras na plataforma'
     ]
   }
 ];

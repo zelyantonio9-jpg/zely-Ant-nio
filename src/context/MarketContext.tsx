@@ -20,8 +20,16 @@ import {
   INSSValidationResult,
   INSSAuditLog,
   ProductReview,
-  PlatformConfig
+  PlatformConfig,
+  FormalizationDossier,
+  FormalizationStage,
+  FormalizationDocument,
+  InstitutionalReferral,
+  INSSVerificationRecord,
+  FormalizationAuditLog,
+  FormalizationStageStatus
 } from '../types';
+import { DiagnosisInput, DiagnosisResult, FormalizationEngine } from '../services/formalizationEngine';
 import { calculateFreightEstimate } from '../data/angolaGeoData';
 import { api } from '../services/apiClient';
 import { FirestoreSyncService } from '../services/firestoreService';
@@ -113,6 +121,21 @@ interface MarketContextType {
   inssAuditLogs: INSSAuditLog[];
   refreshInssAuditLogs: () => Promise<void>;
   attemptInssModification: (payload: any) => Promise<any>;
+  // Formalization Program
+  formalizationDossiers: FormalizationDossier[];
+  formalizationStages: FormalizationStage[];
+  formalizationDocuments: FormalizationDocument[];
+  institutionalReferrals: InstitutionalReferral[];
+  inssVerifications: INSSVerificationRecord[];
+  formalizationAuditLogs: FormalizationAuditLog[];
+  currentDossier?: FormalizationDossier;
+  startOrUpdateFormalization: (diagnosis: DiagnosisInput, result: DiagnosisResult) => Promise<FormalizationDossier>;
+  uploadFormalizationDoc: (docType: string, title: string, fileData: { fileName: string; fileSizeKb: number; fileMimeType: string; fileUrl?: string }) => Promise<void>;
+  approveFormalizationDoc: (docId: string, notes?: string) => Promise<void>;
+  rejectFormalizationDoc: (docId: string, reason: string) => Promise<void>;
+  advanceFormalizationStage: (dossierId: string, newStage: FormalizationStageStatus, notes: string) => Promise<void>;
+  generateInstitutionalReferral: (target: 'AGT' | 'INSS' | 'PREI_GUICHE_UNICO' | 'BANCO_COMERCIAL') => Promise<InstitutionalReferral>;
+  validateFormalizationINSS: (dossierId: string, niss: string, officialRef: string) => Promise<void>;
   resetToOfficialData: () => void;
   clearAllTransactions: () => void;
 }
@@ -306,6 +329,37 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   });
 
+  // Formalization Program States
+  const [formalizationDossiers, setFormalizationDossiers] = useState<FormalizationDossier[]>(() => {
+    const saved = localStorage.getItem('ao_market_formalization_dossiers');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [formalizationStages, setFormalizationStages] = useState<FormalizationStage[]>(() => {
+    const saved = localStorage.getItem('ao_market_formalization_stages');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [formalizationDocuments, setFormalizationDocuments] = useState<FormalizationDocument[]>(() => {
+    const saved = localStorage.getItem('ao_market_formalization_documents');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [institutionalReferrals, setInstitutionalReferrals] = useState<InstitutionalReferral[]>(() => {
+    const saved = localStorage.getItem('ao_market_institutional_referrals');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [inssVerifications, setInssVerifications] = useState<INSSVerificationRecord[]>(() => {
+    const saved = localStorage.getItem('ao_market_inss_verifications');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [formalizationAuditLogs, setFormalizationAuditLogs] = useState<FormalizationAuditLog[]>(() => {
+    const saved = localStorage.getItem('ao_market_formalization_audit_logs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [notifications, setNotifications] = useState<EcosystemNotification[]>([]);
 
   // Keep localStorage in sync for favorites, reviews and platformConfig
@@ -362,6 +416,43 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setDisputes(cloudDisputes);
     });
 
+    // 7. Formalization Subscriptions
+    const unsubDossiers = FirestoreSyncService.subscribeToFormalizationDossiers((cloudDossiers) => {
+      if (cloudDossiers && cloudDossiers.length > 0) {
+        setFormalizationDossiers(cloudDossiers);
+      }
+    });
+
+    const unsubStages = FirestoreSyncService.subscribeToFormalizationStages((cloudStages) => {
+      if (cloudStages && cloudStages.length > 0) {
+        setFormalizationStages(cloudStages);
+      }
+    });
+
+    const unsubDocs = FirestoreSyncService.subscribeToFormalizationDocuments((cloudDocs) => {
+      if (cloudDocs && cloudDocs.length > 0) {
+        setFormalizationDocuments(cloudDocs);
+      }
+    });
+
+    const unsubReferrals = FirestoreSyncService.subscribeToInstitutionalReferrals((cloudRefs) => {
+      if (cloudRefs && cloudRefs.length > 0) {
+        setInstitutionalReferrals(cloudRefs);
+      }
+    });
+
+    const unsubInssVerifs = FirestoreSyncService.subscribeToINSSVerifications((cloudVerifs) => {
+      if (cloudVerifs && cloudVerifs.length > 0) {
+        setInssVerifications(cloudVerifs);
+      }
+    });
+
+    const unsubFormalLogs = FirestoreSyncService.subscribeToFormalizationAuditLogs((cloudLogs) => {
+      if (cloudLogs && cloudLogs.length > 0) {
+        setFormalizationAuditLogs(cloudLogs);
+      }
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -369,8 +460,39 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       unsubFreight();
       unsubRfqs();
       unsubDisputes();
+      unsubDossiers();
+      unsubStages();
+      unsubDocs();
+      unsubReferrals();
+      unsubInssVerifs();
+      unsubFormalLogs();
     };
   }, []);
+
+  // Sync to local storage for offline resilience
+  useEffect(() => {
+    localStorage.setItem('ao_market_formalization_dossiers', JSON.stringify(formalizationDossiers));
+  }, [formalizationDossiers]);
+
+  useEffect(() => {
+    localStorage.setItem('ao_market_formalization_stages', JSON.stringify(formalizationStages));
+  }, [formalizationStages]);
+
+  useEffect(() => {
+    localStorage.setItem('ao_market_formalization_documents', JSON.stringify(formalizationDocuments));
+  }, [formalizationDocuments]);
+
+  useEffect(() => {
+    localStorage.setItem('ao_market_institutional_referrals', JSON.stringify(institutionalReferrals));
+  }, [institutionalReferrals]);
+
+  useEffect(() => {
+    localStorage.setItem('ao_market_inss_verifications', JSON.stringify(inssVerifications));
+  }, [inssVerifications]);
+
+  useEffect(() => {
+    localStorage.setItem('ao_market_formalization_audit_logs', JSON.stringify(formalizationAuditLogs));
+  }, [formalizationAuditLogs]);
 
   // Sync to local storage for offline resilience
   useEffect(() => {
@@ -1515,6 +1637,351 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // --- Formalization Program Handlers ---
+
+  const currentDossier = formalizationDossiers.find(d => d.userId === currentUser.id);
+
+  const startOrUpdateFormalization = async (diagnosis: DiagnosisInput, result: DiagnosisResult): Promise<FormalizationDossier> => {
+    const existingDossier = formalizationDossiers.find(d => d.userId === currentUser.id);
+    const dossierId = existingDossier ? existingDossier.id : `dos_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    const newDossier: FormalizationDossier = {
+      id: dossierId,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userPhone: currentUser.phone,
+      activityType: diagnosis.activityType,
+      activityDescription: diagnosis.activityDescription || '',
+      marketLocation: diagnosis.marketLocation || '',
+      province: diagnosis.province,
+      municipality: diagnosis.municipality,
+      commune: diagnosis.commune,
+      status: result.initialStatus,
+      progressPercentage: result.initialProgressPercentage,
+      currentStageCode: result.initialStatus,
+      biNumber: diagnosis.biNumber,
+      nifNumber: diagnosis.nifNumber,
+      inssNumber: diagnosis.inssNumber,
+      documentsCount: existingDossier ? existingDossier.documentsCount : (diagnosis.hasBi ? 1 : 0),
+      approvedDocumentsCount: existingDossier ? existingDossier.approvedDocumentsCount : 0,
+      createdAt: existingDossier ? existingDossier.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      assignedAgentId: existingDossier?.assignedAgentId,
+      assignedAgentName: existingDossier?.assignedAgentName,
+      targetRegime: result.recommendedPath,
+      estimatedCompletionDate: new Date(Date.now() + result.estimatedDaysToCompletion * 86400000).toISOString()
+    };
+
+    // Generate initial stages
+    const generatedStages = FormalizationEngine.generateInitialStages(dossierId, result).map((s, idx) => ({
+      id: `stg_${dossierId}_${idx + 1}`,
+      dossierId: dossierId,
+      stageCode: s.stageCode,
+      stageName: s.stageName,
+      orderIndex: idx + 1,
+      institutionResponsible: s.institution,
+      status: s.status,
+      requiredDocuments: s.requiredDocs,
+      startedAt: idx === 0 ? new Date().toISOString() : undefined,
+      completedAt: idx === 0 ? new Date().toISOString() : undefined
+    }));
+
+    // Save to Firestore & local state
+    await FirestoreSyncService.saveFormalizationDossier(newDossier);
+    for (const stage of generatedStages) {
+      await FirestoreSyncService.saveFormalizationStage(stage);
+    }
+
+    // Record Audit
+    const audit: FormalizationAuditLog = {
+      id: `faudit_${Date.now()}`,
+      dossierId: dossierId,
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+      actorRole: currentUser.role,
+      action: existingDossier ? 'DOSSIER_UPDATED' : 'DOSSIER_CREATED',
+      timestamp: new Date().toISOString(),
+      reason: `Diagnóstico realizado com sucesso. Roteiro recomendado: ${result.recommendedPath} (${result.initialProgressPercentage}% concluído)`
+    };
+    await FirestoreSyncService.saveFormalizationAuditLog(audit);
+
+    setFormalizationDossiers(prev => {
+      const filtered = prev.filter(d => d.id !== newDossier.id);
+      return [newDossier, ...filtered];
+    });
+
+    setFormalizationStages(prev => {
+      const filtered = prev.filter(s => s.dossierId !== dossierId);
+      return [...generatedStages, ...filtered];
+    });
+
+    setFormalizationAuditLogs(prev => [audit, ...prev]);
+
+    // Update user profile with formalization link
+    updateUserProfile({
+      formalizationDossierId: dossierId,
+      formalizationStage: result.initialStatus,
+      informalActivityType: diagnosis.activityType
+    });
+
+    addNotification('Dossiê de Formalização Criado', 'O seu roteiro personalizado para formalização progressiva está ativo!', 'SECURITY');
+    return newDossier;
+  };
+
+  const uploadFormalizationDoc = async (
+    docType: string, 
+    title: string, 
+    fileData: { fileName: string; fileSizeKb: number; fileMimeType: string; fileUrl?: string }
+  ): Promise<void> => {
+    let dossier = formalizationDossiers.find(d => d.userId === currentUser.id);
+    if (!dossier) {
+      throw new Error('É necessário realizar o diagnóstico antes de anexar documentos.');
+    }
+
+    const docId = `fdoc_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const newDoc: FormalizationDocument = {
+      id: docId,
+      dossierId: dossier.id,
+      userId: currentUser.id,
+      documentType: docType as any,
+      title: title,
+      fileName: fileData.fileName,
+      fileSizeKb: fileData.fileSizeKb,
+      fileMimeType: fileData.fileMimeType,
+      fileUrl: fileData.fileUrl,
+      status: 'SUBMETIDO',
+      submittedAt: new Date().toISOString(),
+      verified: false
+    };
+
+    await FirestoreSyncService.saveFormalizationDocument(newDoc);
+
+    const updatedDossier: FormalizationDossier = {
+      ...dossier,
+      documentsCount: (dossier.documentsCount || 0) + 1,
+      status: 'DOCUMENTOS_SUBMETIDOS',
+      updatedAt: new Date().toISOString()
+    };
+    await FirestoreSyncService.saveFormalizationDossier(updatedDossier);
+
+    const audit: FormalizationAuditLog = {
+      id: `faudit_${Date.now()}`,
+      dossierId: dossier.id,
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+      actorRole: currentUser.role,
+      action: 'DOCUMENT_UPLOADED',
+      timestamp: new Date().toISOString(),
+      reason: `Documento "${title}" (${fileData.fileName}) anexado pelo titular.`
+    };
+    await FirestoreSyncService.saveFormalizationAuditLog(audit);
+
+    setFormalizationDocuments(prev => [newDoc, ...prev]);
+    setFormalizationDossiers(prev => prev.map(d => d.id === updatedDossier.id ? updatedDossier : d));
+    setFormalizationAuditLogs(prev => [audit, ...prev]);
+    addNotification('Documento Anexado', `O comprovativo "${title}" foi submetido para validação.`, 'SECURITY');
+  };
+
+  const approveFormalizationDoc = async (docId: string, notes?: string): Promise<void> => {
+    const docItem = formalizationDocuments.find(d => d.id === docId);
+    if (!docItem) return;
+
+    const updatedDoc: FormalizationDocument = {
+      ...docItem,
+      status: 'APROVADO',
+      reviewedByUserId: currentUser.id,
+      reviewedByName: currentUser.name,
+      reviewedAt: new Date().toISOString(),
+      notes: notes || 'Documento aprovado pelo agente.',
+      verified: true
+    };
+    await FirestoreSyncService.saveFormalizationDocument(updatedDoc);
+
+    const dossier = formalizationDossiers.find(d => d.id === docItem.dossierId);
+    if (dossier) {
+      const newApprovedCount = (dossier.approvedDocumentsCount || 0) + 1;
+      const newProgress = Math.min(dossier.progressPercentage + 15, 100);
+      const updatedDossier: FormalizationDossier = {
+        ...dossier,
+        approvedDocumentsCount: newApprovedCount,
+        progressPercentage: newProgress,
+        status: newProgress >= 90 ? 'FORMALIZACAO_CONCLUIDA' : 'EM_ANALISE',
+        updatedAt: new Date().toISOString()
+      };
+      await FirestoreSyncService.saveFormalizationDossier(updatedDossier);
+      setFormalizationDossiers(prev => prev.map(d => d.id === updatedDossier.id ? updatedDossier : d));
+    }
+
+    const audit: FormalizationAuditLog = {
+      id: `faudit_${Date.now()}`,
+      dossierId: docItem.dossierId,
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+      actorRole: currentUser.role,
+      action: 'DOCUMENT_APPROVED',
+      timestamp: new Date().toISOString(),
+      reason: `Documento "${docItem.title}" aprovado por ${currentUser.name}. ${notes || ''}`
+    };
+    await FirestoreSyncService.saveFormalizationAuditLog(audit);
+
+    setFormalizationDocuments(prev => prev.map(d => d.id === docId ? updatedDoc : d));
+    setFormalizationAuditLogs(prev => [audit, ...prev]);
+  };
+
+  const rejectFormalizationDoc = async (docId: string, reason: string): Promise<void> => {
+    const docItem = formalizationDocuments.find(d => d.id === docId);
+    if (!docItem) return;
+
+    const updatedDoc: FormalizationDocument = {
+      ...docItem,
+      status: 'REJEITADO',
+      rejectionReason: reason,
+      reviewedByUserId: currentUser.id,
+      reviewedByName: currentUser.name,
+      reviewedAt: new Date().toISOString(),
+      verified: false
+    };
+    await FirestoreSyncService.saveFormalizationDocument(updatedDoc);
+
+    const audit: FormalizationAuditLog = {
+      id: `faudit_${Date.now()}`,
+      dossierId: docItem.dossierId,
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+      actorRole: currentUser.role,
+      action: 'DOCUMENT_REJECTED',
+      timestamp: new Date().toISOString(),
+      reason: `Documento "${docItem.title}" rejeitado. Motivo: ${reason}`
+    };
+    await FirestoreSyncService.saveFormalizationAuditLog(audit);
+
+    setFormalizationDocuments(prev => prev.map(d => d.id === docId ? updatedDoc : d));
+    setFormalizationAuditLogs(prev => [audit, ...prev]);
+  };
+
+  const advanceFormalizationStage = async (dossierId: string, newStage: FormalizationStageStatus, notes: string): Promise<void> => {
+    const dossier = formalizationDossiers.find(d => d.id === dossierId);
+    if (!dossier) return;
+
+    let newProgress = dossier.progressPercentage;
+    if (newStage === 'ENCAMINHADO_AGT') newProgress = Math.max(newProgress, 50);
+    if (newStage === 'NIF_EMITIDO') newProgress = Math.max(newProgress, 70);
+    if (newStage === 'ENCAMINHADO_INSS') newProgress = Math.max(newProgress, 80);
+    if (newStage === 'INSS_VINCULADO') newProgress = Math.max(newProgress, 95);
+    if (newStage === 'FORMALIZACAO_CONCLUIDA') newProgress = 100;
+
+    const updatedDossier: FormalizationDossier = {
+      ...dossier,
+      status: newStage,
+      currentStageCode: newStage,
+      progressPercentage: newProgress,
+      updatedAt: new Date().toISOString()
+    };
+    await FirestoreSyncService.saveFormalizationDossier(updatedDossier);
+
+    const audit: FormalizationAuditLog = {
+      id: `faudit_${Date.now()}`,
+      dossierId: dossier.id,
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+      actorRole: currentUser.role,
+      action: 'STAGE_ADVANCED',
+      timestamp: new Date().toISOString(),
+      reason: `Etapa avançada para ${newStage}. ${notes}`
+    };
+    await FirestoreSyncService.saveFormalizationAuditLog(audit);
+
+    setFormalizationDossiers(prev => prev.map(d => d.id === dossier.id ? updatedDossier : d));
+    setFormalizationAuditLogs(prev => [audit, ...prev]);
+  };
+
+  const generateInstitutionalReferral = async (target: 'AGT' | 'INSS' | 'PREI_GUICHE_UNICO' | 'BANCO_COMERCIAL'): Promise<InstitutionalReferral> => {
+    let dossier = formalizationDossiers.find(d => d.userId === currentUser.id);
+    const dossierId = dossier ? dossier.id : `dos_${currentUser.id}`;
+
+    const refCode = `REF-${target}-${Date.now().toString().slice(-6)}`;
+    const referral: InstitutionalReferral = {
+      id: `ref_${Date.now()}`,
+      dossierId: dossierId,
+      userId: currentUser.id,
+      targetInstitution: target,
+      referralCode: refCode,
+      generatedAt: new Date().toISOString(),
+      status: 'EMITIDO',
+      instructionsPdfUrl: undefined,
+      notes: `Guia de encaminhamento prioritário emitida pelo AO MARKET para atendimento presencial na ${target}.`
+    };
+
+    await FirestoreSyncService.saveInstitutionalReferral(referral);
+
+    const audit: FormalizationAuditLog = {
+      id: `faudit_${Date.now()}`,
+      dossierId: dossierId,
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+      actorRole: currentUser.role,
+      action: 'REFERRAL_GENERATED',
+      timestamp: new Date().toISOString(),
+      reason: `Guia de encaminhamento ${refCode} gerada para ${target}.`
+    };
+    await FirestoreSyncService.saveFormalizationAuditLog(audit);
+
+    setInstitutionalReferrals(prev => [referral, ...prev]);
+    setFormalizationAuditLogs(prev => [audit, ...prev]);
+    addNotification('Guia Institucional Emitida', `A sua guia para a ${target} (${refCode}) foi gerada com sucesso!`, 'SECURITY');
+    return referral;
+  };
+
+  const validateFormalizationINSS = async (dossierId: string, niss: string, officialRef: string): Promise<void> => {
+    const dossier = formalizationDossiers.find(d => d.id === dossierId);
+    if (!dossier) return;
+
+    const record: INSSVerificationRecord = {
+      id: `inss_v_${Date.now()}`,
+      dossierId: dossier.id,
+      userId: dossier.userId,
+      niss: niss,
+      nif: dossier.nifNumber,
+      officialEntityName: dossier.userName,
+      complianceStatus: 'REGULAR',
+      status: 'VERIFICADO_COM_SUCESSO',
+      verificationType: 'VERIFICACAO_MANUAL_AGENTE',
+      verifiedByUserId: currentUser.id,
+      verifiedByName: currentUser.name,
+      verifiedAt: new Date().toISOString(),
+      officialDocumentReference: officialRef,
+      createdAt: new Date().toISOString()
+    };
+
+    await FirestoreSyncService.saveINSSVerification(record);
+
+    const updatedDossier: FormalizationDossier = {
+      ...dossier,
+      inssNumber: niss,
+      status: 'INSS_VINCULADO',
+      progressPercentage: Math.max(dossier.progressPercentage, 95),
+      updatedAt: new Date().toISOString()
+    };
+    await FirestoreSyncService.saveFormalizationDossier(updatedDossier);
+
+    const audit: FormalizationAuditLog = {
+      id: `faudit_${Date.now()}`,
+      dossierId: dossier.id,
+      actorId: currentUser.id,
+      actorName: currentUser.name,
+      actorRole: currentUser.role,
+      action: 'INSS_RECORD_VALIDATED',
+      timestamp: new Date().toISOString(),
+      reason: `Número NISS ${niss} verificado e vinculado com sucesso por ${currentUser.name}. Ref: ${officialRef}`
+    };
+    await FirestoreSyncService.saveFormalizationAuditLog(audit);
+
+    setInssVerifications(prev => [record, ...prev]);
+    setFormalizationDossiers(prev => prev.map(d => d.id === dossier.id ? updatedDossier : d));
+    setFormalizationAuditLogs(prev => [audit, ...prev]);
+    addNotification('INSS Verificado', `NISS ${niss} validado e vinculado ao dossiê ${dossier.id}.`, 'SECURITY');
+  };
+
   const formatKz = (val: number): string => {
     return new Intl.NumberFormat('pt-AO', {
       style: 'currency',
@@ -1591,6 +2058,21 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       inssAuditLogs,
       refreshInssAuditLogs,
       attemptInssModification,
+      // Formalization Program
+      formalizationDossiers,
+      formalizationStages,
+      formalizationDocuments,
+      institutionalReferrals,
+      inssVerifications,
+      formalizationAuditLogs,
+      currentDossier,
+      startOrUpdateFormalization,
+      uploadFormalizationDoc,
+      approveFormalizationDoc,
+      rejectFormalizationDoc,
+      advanceFormalizationStage,
+      generateInstitutionalReferral,
+      validateFormalizationINSS,
       resetToOfficialData,
       clearAllTransactions
     }}>

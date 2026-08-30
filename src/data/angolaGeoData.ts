@@ -359,3 +359,5 @@ export function calculateFreightEstimate(
     transitDays
   };
 }
+
+export const PROVINCES_ANGOLA = ANGOLA_PROVINCES;

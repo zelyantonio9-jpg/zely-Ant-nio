@@ -18,7 +18,13 @@ import {
   B2BQuotationRequest, 
   DisputeRecord, 
   SecurityAuditEntry, 
-  INSSAuditLog 
+  INSSAuditLog,
+  FormalizationDossier,
+  FormalizationStage,
+  FormalizationDocument,
+  InstitutionalReferral,
+  INSSVerificationRecord,
+  FormalizationAuditLog
 } from '../types';
 
 export class FirestoreSyncService {
@@ -166,6 +172,74 @@ export class FirestoreSyncService {
     });
   }
 
+  // --- Formalization Program Subscriptions ---
+
+  public static subscribeToFormalizationDossiers(onUpdate: (dossiers: FormalizationDossier[]) => void): Unsubscribe {
+    const q = query(collection(db, 'formalization_dossiers'));
+    return onSnapshot(q, (snapshot) => {
+      const items: FormalizationDossier[] = [];
+      snapshot.forEach((d) => items.push(d.data() as FormalizationDossier));
+      onUpdate(items);
+    }, (error) => {
+      console.warn('[Firestore] Formalization dossiers subscription notice:', error);
+    });
+  }
+
+  public static subscribeToFormalizationStages(onUpdate: (stages: FormalizationStage[]) => void): Unsubscribe {
+    const q = query(collection(db, 'formalization_stages'));
+    return onSnapshot(q, (snapshot) => {
+      const items: FormalizationStage[] = [];
+      snapshot.forEach((d) => items.push(d.data() as FormalizationStage));
+      onUpdate(items);
+    }, (error) => {
+      console.warn('[Firestore] Formalization stages subscription notice:', error);
+    });
+  }
+
+  public static subscribeToFormalizationDocuments(onUpdate: (docs: FormalizationDocument[]) => void): Unsubscribe {
+    const q = query(collection(db, 'formalization_documents'));
+    return onSnapshot(q, (snapshot) => {
+      const items: FormalizationDocument[] = [];
+      snapshot.forEach((d) => items.push(d.data() as FormalizationDocument));
+      onUpdate(items);
+    }, (error) => {
+      console.warn('[Firestore] Formalization documents subscription notice:', error);
+    });
+  }
+
+  public static subscribeToInstitutionalReferrals(onUpdate: (referrals: InstitutionalReferral[]) => void): Unsubscribe {
+    const q = query(collection(db, 'institutional_referrals'));
+    return onSnapshot(q, (snapshot) => {
+      const items: InstitutionalReferral[] = [];
+      snapshot.forEach((d) => items.push(d.data() as InstitutionalReferral));
+      onUpdate(items);
+    }, (error) => {
+      console.warn('[Firestore] Institutional referrals subscription notice:', error);
+    });
+  }
+
+  public static subscribeToINSSVerifications(onUpdate: (verifications: INSSVerificationRecord[]) => void): Unsubscribe {
+    const q = query(collection(db, 'inss_verifications'));
+    return onSnapshot(q, (snapshot) => {
+      const items: INSSVerificationRecord[] = [];
+      snapshot.forEach((d) => items.push(d.data() as INSSVerificationRecord));
+      onUpdate(items);
+    }, (error) => {
+      console.warn('[Firestore] INSS verifications subscription notice:', error);
+    });
+  }
+
+  public static subscribeToFormalizationAuditLogs(onUpdate: (logs: FormalizationAuditLog[]) => void): Unsubscribe {
+    const q = query(collection(db, 'formalization_audit_logs'));
+    return onSnapshot(q, (snapshot) => {
+      const items: FormalizationAuditLog[] = [];
+      snapshot.forEach((d) => items.push(d.data() as FormalizationAuditLog));
+      onUpdate(items);
+    }, (error) => {
+      console.warn('[Firestore] Formalization audit logs subscription notice:', error);
+    });
+  }
+
   // --- Real-time Persistence Methods directly to Firebase Firestore ---
 
   public static async saveProduct(product: Product): Promise<void> {
@@ -249,6 +323,72 @@ export class FirestoreSyncService {
       await setDoc(doc(db, 'inss_audit_logs', log.id), log);
     } catch (e) {
       console.warn('[Firestore] saveINSSAuditLog notice:', e);
+    }
+  }
+
+  // --- Formalization Persistence Methods ---
+
+  public static async saveFormalizationDossier(dossier: FormalizationDossier): Promise<void> {
+    try {
+      await setDoc(doc(db, 'formalization_dossiers', dossier.id), dossier);
+    } catch (e) {
+      console.warn('[Firestore] saveFormalizationDossier notice:', e);
+    }
+  }
+
+  public static async deleteFormalizationDossier(dossierId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'formalization_dossiers', dossierId));
+    } catch (e) {
+      console.warn('[Firestore] deleteFormalizationDossier notice:', e);
+    }
+  }
+
+  public static async saveFormalizationStage(stage: FormalizationStage): Promise<void> {
+    try {
+      await setDoc(doc(db, 'formalization_stages', stage.id), stage);
+    } catch (e) {
+      console.warn('[Firestore] saveFormalizationStage notice:', e);
+    }
+  }
+
+  public static async saveFormalizationDocument(formalizationDoc: FormalizationDocument): Promise<void> {
+    try {
+      await setDoc(doc(db, 'formalization_documents', formalizationDoc.id), formalizationDoc);
+    } catch (e) {
+      console.warn('[Firestore] saveFormalizationDocument notice:', e);
+    }
+  }
+
+  public static async deleteFormalizationDocument(documentId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'formalization_documents', documentId));
+    } catch (e) {
+      console.warn('[Firestore] deleteFormalizationDocument notice:', e);
+    }
+  }
+
+  public static async saveInstitutionalReferral(referral: InstitutionalReferral): Promise<void> {
+    try {
+      await setDoc(doc(db, 'institutional_referrals', referral.id), referral);
+    } catch (e) {
+      console.warn('[Firestore] saveInstitutionalReferral notice:', e);
+    }
+  }
+
+  public static async saveINSSVerification(verification: INSSVerificationRecord): Promise<void> {
+    try {
+      await setDoc(doc(db, 'inss_verifications', verification.id), verification);
+    } catch (e) {
+      console.warn('[Firestore] saveINSSVerification notice:', e);
+    }
+  }
+
+  public static async saveFormalizationAuditLog(log: FormalizationAuditLog): Promise<void> {
+    try {
+      await setDoc(doc(db, 'formalization_audit_logs', log.id), log);
+    } catch (e) {
+      console.warn('[Firestore] saveFormalizationAuditLog notice:', e);
     }
   }
 }

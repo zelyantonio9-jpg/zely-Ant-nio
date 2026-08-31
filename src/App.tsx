@@ -19,6 +19,7 @@ import { DocumentVerificationCenter } from './components/DocumentVerificationCen
 import { CompanyTeamManagement } from './components/CompanyTeamManagement';
 import { SecurityAuditorModal } from './components/SecurityAuditorModal';
 import { LegalAndGovernanceModal, LegalDocTab } from './components/LegalAndGovernanceModal';
+import { ProductBacklogModal } from './components/ProductBacklogModal';
 import { RestrictedAccessView } from './components/RestrictedAccessView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { Footer } from './components/Footer';
@@ -46,6 +47,7 @@ const MainAppContent: React.FC = () => {
   const [isDocCenterOpen, setIsDocCenterOpen] = useState(false);
   const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
   const [isSecurityAuditorOpen, setIsSecurityAuditorOpen] = useState(false);
+  const [isBacklogOpen, setIsBacklogOpen] = useState(false);
   const [trackedOrder, setTrackedOrder] = useState<Order | null>(null);
 
   const handleOpenLegal = (tab: LegalDocTab = 'terms') => {
@@ -83,6 +85,7 @@ const MainAppContent: React.FC = () => {
         onOpenTeamManagement={() => setIsTeamManagementOpen(true)}
         onOpenSecurityAuditor={currentUser.role === 'admin' ? () => setIsSecurityAuditorOpen(true) : undefined}
         onOpenAdminSecretModal={() => setIsAdminSecretModalOpen(true)}
+        onOpenBacklog={() => setIsBacklogOpen(true)}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         activeTab={activeTab}
@@ -320,6 +323,13 @@ const MainAppContent: React.FC = () => {
         onOpenLegal={handleOpenLegal}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenAdminSecretModal={() => setIsAdminSecretModalOpen(true)}
+        onOpenBacklog={() => setIsBacklogOpen(true)}
+      />
+
+      {/* Official Product Backlog Modal (Excel / CSV View & Download) */}
+      <ProductBacklogModal
+        isOpen={isBacklogOpen}
+        onClose={() => setIsBacklogOpen(false)}
       />
 
       {/* Mobile Bottom Bar for native app-like UX on small screens */}

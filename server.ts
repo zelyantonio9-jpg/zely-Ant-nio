@@ -28,6 +28,8 @@ import {
 } from './src/utils/rbacEngine';
 import { ROLE_PERMISSIONS_MATRIX } from './src/utils/rbacMatrix';
 import { INSSOfficialService } from './src/services/inssService';
+import { PRODUCT_BACKLOG_DATA } from './src/data/productBacklogData';
+import * as XLSX from 'xlsx';
 
 // In-Memory Database / State for AO MARKET API routes
 let dbUsers: UserProfile[] = [];
@@ -134,6 +136,92 @@ async function startServer() {
     return res.json(publicDirectory);
   });
 
+  // Product Backlog Download & JSON Endpoints
+  app.get('/api/backlog', (req, res) => {
+    const completed = PRODUCT_BACKLOG_DATA.filter(i => i.status === 'Concluído');
+    const pending = PRODUCT_BACKLOG_DATA.filter(i => i.status === 'Não Concluído');
+    return res.json({
+      summary: {
+        total: PRODUCT_BACKLOG_DATA.length,
+        completedCount: completed.length,
+        pendingCount: pending.length,
+        completedStoryPoints: completed.reduce((acc, i) => acc + i.storyPoints, 0),
+        pendingStoryPoints: pending.reduce((acc, i) => acc + i.storyPoints, 0),
+        completionRate: `${Math.round((completed.length / PRODUCT_BACKLOG_DATA.length) * 100)}%`
+      },
+      items: PRODUCT_BACKLOG_DATA
+    });
+  });
+
+  app.get('/api/backlog/download/csv', (req, res) => {
+    const headers = ['ID', 'Épico / Módulo', 'Item do Backlog', 'Descrição', 'Prioridade', 'Estado', 'Story Points', 'Critérios de Aceitação', 'Notas Técnicas'];
+    const escapeCsv = (str: string | number) => `"${String(str).replace(/"/g, '""')}"`;
+    const csvRows = [
+      headers.map(escapeCsv).join(';'),
+      ...PRODUCT_BACKLOG_DATA.map(item => [
+        escapeCsv(item.id),
+        escapeCsv(item.epic),
+        escapeCsv(item.title),
+        escapeCsv(item.description),
+        escapeCsv(item.priority),
+        escapeCsv(item.status),
+        escapeCsv(item.storyPoints),
+        escapeCsv(item.acceptanceCriteria),
+        escapeCsv(item.technicalNotes)
+      ].join(';'))
+    ];
+    const csvContent = '\uFEFF' + csvRows.join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="AO_MARKET_Product_Backlog.csv"');
+    return res.send(csvContent);
+  });
+
+  app.get('/api/backlog/download/excel', (req, res) => {
+    const rows = PRODUCT_BACKLOG_DATA.map(item => ({
+      'ID': item.id,
+      'Épico / Módulo': item.epic,
+      'Item do Backlog': item.title,
+      'Descrição': item.description,
+      'Prioridade': item.priority,
+      'Estado': item.status,
+      'Story Points': item.storyPoints,
+      'Critérios de Aceitação': item.acceptanceCriteria,
+      'Notas Técnicas': item.technicalNotes
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+      { wch: 10 }, { wch: 25 }, { wch: 35 }, { wch: 50 },
+      { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 45 }, { wch: 45 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Product Backlog AO MARKET');
+
+    const completedCount = PRODUCT_BACKLOG_DATA.filter(i => i.status === 'Concluído').length;
+    const pendingCount = PRODUCT_BACKLOG_DATA.filter(i => i.status === 'Não Concluído').length;
+    const completedSP = PRODUCT_BACKLOG_DATA.filter(i => i.status === 'Concluído').reduce((acc, i) => acc + i.storyPoints, 0);
+    const pendingSP = PRODUCT_BACKLOG_DATA.filter(i => i.status === 'Não Concluído').reduce((acc, i) => acc + i.storyPoints, 0);
+
+    const summaryData = [
+      { 'Métrica': 'Total de Itens no Backlog', 'Valor': PRODUCT_BACKLOG_DATA.length },
+      { 'Métrica': 'Itens Concluídos', 'Valor': completedCount },
+      { 'Métrica': 'Itens Não Concluídos / Pendentes', 'Valor': pendingCount },
+      { 'Métrica': 'Taxa de Conclusão (%)', 'Valor': `${Math.round((completedCount / PRODUCT_BACKLOG_DATA.length) * 100)}%` },
+      { 'Métrica': 'Story Points Concluídos', 'Valor': completedSP },
+      { 'Métrica': 'Story Points Pendentes', 'Valor': pendingSP },
+      { 'Métrica': 'Total Story Points', 'Valor': completedSP + pendingSP }
+    ];
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+    summarySheet['!cols'] = [{ wch: 35 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumo Geral');
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="AO_MARKET_Product_Backlog.xlsx"');
+    return res.send(buffer);
+  });
+
   app.post('/api/auth/login', (req, res) => {
     const { identifier } = req.body;
     if (!identifier) {
@@ -159,6 +247,34 @@ async function startServer() {
     const userData = req.body as Partial<UserProfile>;
     if (!userData.name || !userData.role || !userData.phone) {
       return res.status(400).json({ error: 'Nome, Perfil e Telefone são obrigatórios.' });
+    }
+
+    const cleanPhone = userData.phone.replace(/\s+/g, '');
+    const cleanEmail = userData.email?.trim().toLowerCase();
+    const cleanNif = userData.nif?.trim();
+
+    // Check uniqueness
+    const existingUser = dbUsers.find(u => {
+      const uPhone = u.phone.replace(/\s+/g, '');
+      const uEmail = u.email.trim().toLowerCase();
+      const uNif = u.nif?.trim();
+
+      if (uPhone === cleanPhone) return true;
+      if (cleanEmail && uEmail === cleanEmail) return true;
+      if (cleanNif && uNif && uNif === cleanNif) return true;
+      return false;
+    });
+
+    if (existingUser) {
+      let duplicateField = 'contacto';
+      if (existingUser.phone.replace(/\s+/g, '') === cleanPhone) duplicateField = 'número de telefone';
+      else if (cleanEmail && existingUser.email.trim().toLowerCase() === cleanEmail) duplicateField = 'endereço de email';
+      else if (cleanNif && existingUser.nif?.trim() === cleanNif) duplicateField = 'NIF';
+
+      return res.status(409).json({ 
+        error: `Já existe uma conta registada com este ${duplicateField} (${userData.phone || userData.email || userData.nif}).`,
+        errorCode: 'DUPLICATE_IDENTITY'
+      });
     }
 
     const newUser: UserProfile = {
@@ -468,6 +584,26 @@ async function startServer() {
     }
 
     const prodData = req.body;
+
+    // Strict Image Validation: Products cannot be published without real photos
+    if (!prodData.images || !Array.isArray(prodData.images) || prodData.images.length === 0) {
+      return res.status(400).json({ 
+        error: 'É obrigatório carregar pelo menos uma fotografia real do lote/produto (Firebase Storage).',
+        errorCode: 'IMAGE_REQUIRED'
+      });
+    }
+
+    const hasPlaceholder = prodData.images.some((img: string) => 
+      typeof img === 'string' && (img.includes('unsplash.com') || img.includes('placeholder') || img.includes('picsum.photos'))
+    );
+
+    if (hasPlaceholder) {
+      return res.status(400).json({
+        error: 'Imagens genéricas ou de catálogo externo não são permitidas. Por favor envie fotos reais da sua colheita ou armazém.',
+        errorCode: 'GENERIC_IMAGE_REJECTED'
+      });
+    }
+
     const newProduct: Product = {
       id: `prod_${Date.now()}`,
       title: prodData.title || 'Produto Agrícola Nacional',
@@ -481,7 +617,7 @@ async function startServer() {
       originMunicipality: prodData.originMunicipality || user.municipality,
       farmOrFactoryName: prodData.farmOrFactoryName || user.companyName || user.name,
       isProducedInAngola: true,
-      images: prodData.images || ['https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=800&q=80'],
+      images: prodData.images,
       producerId: user.id,
       producerName: user.companyName || user.name,
       producerCompanyId: user.companyId,

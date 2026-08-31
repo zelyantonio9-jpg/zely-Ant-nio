@@ -144,6 +144,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       province: currentProvinceData.name,
       municipality: selectedMunicipality,
       address: `${selectedMunicipality}, ${currentProvinceData.name}`,
+      badge: selectedProfile === 'MERCHANT' ? 'Comerciante Certificado' : selectedProfile === 'PRODUCER' ? 'Produtor Verificado' : selectedProfile === 'TRANSPORTER' ? 'Transportador Oficial' : 'Comprador Verificado',
+      merchantData: selectedProfile === 'MERCHANT' ? {
+        businessType: 'GROSSISTA',
+        merchantTypes: ['GROSSISTA', 'RETALHISTA'],
+        hasPhysicalStore: true,
+        storeAddress: `${selectedMunicipality}, ${currentProvinceData.name}`,
+        hasWarehouse: true,
+        warehouseCapacityM3: 500,
+        offersColdStorage: false
+      } : undefined,
+      producerData: selectedProfile === 'PRODUCER' ? {
+        producerType: accountType === 'EMPRESA' ? 'FAZENDA' : 'AGRICULTOR',
+        farmName: displayName,
+        activityCategory: 'AGRICULTURA',
+        mainCropsOrProducts: ['Milho', 'Mandioca', 'Hortícolas'],
+        annualCapacityQty: 50,
+        annualCapacityUnit: 'TONELADAS'
+      } : undefined,
+      transporterData: selectedProfile === 'TRANSPORTER' ? {
+        operatorType: accountType === 'EMPRESA' ? 'EMPRESA_TRANSPORTES' : 'MOTORISTA_INDEPENDENTE',
+        fleetSize: 1,
+        vehicles: [{
+          id: `veh_${Date.now()}`,
+          vehicleType: 'CAMIAO_3_5T',
+          brandModel: 'Mitsubishi Canter',
+          licensePlate: 'LD-88-21-AO',
+          year: 2022,
+          payloadCapacityKg: 3500,
+          volumeCapacityM3: 15,
+          hasRefrigeration: false,
+          technicalInspectionValid: true
+        }],
+        operatingCorridors: [`${currentProvinceData.name} - Luanda`],
+        maxPayloadKg: 3500,
+        offersColdChain: false
+      } : undefined,
+      buyerData: selectedProfile === 'BUYER' ? {
+        buyerType: accountType === 'EMPRESA' ? 'EMPRESA_TRANSFORMADORA' : 'CONSUMIDOR_FINAL',
+        preferredCategories: ['Produtos agrícolas', 'Produtos transformados']
+      } : undefined,
       reputationScore: 5.0,
       completedTransactions: 0,
       fulfillmentRate: 100,

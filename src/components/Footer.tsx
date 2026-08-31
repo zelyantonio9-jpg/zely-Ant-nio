@@ -36,6 +36,7 @@ interface FooterProps {
   onOpenLegal: (tab: LegalDocTab) => void;
   onOpenCart?: () => void;
   onOpenAdminSecretModal?: () => void;
+  onOpenBacklog?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -44,7 +45,8 @@ export const Footer: React.FC<FooterProps> = ({
   onOpenAssistant,
   onOpenLegal,
   onOpenCart,
-  onOpenAdminSecretModal
+  onOpenAdminSecretModal,
+  onOpenBacklog
 }) => {
   const { products, currentUser, isAuthenticated } = useMarket();
   const currentYear = new Date().getFullYear();
@@ -393,6 +395,18 @@ export const Footer: React.FC<FooterProps> = ({
                   <span>Política de Devoluções</span>
                 </button>
               </li>
+              {onOpenBacklog && (
+                <li>
+                  <button 
+                    id="footer-nav-backlog"
+                    onClick={onOpenBacklog}
+                    className="hover:text-emerald-400 text-emerald-400 font-semibold transition flex items-center space-x-1.5 cursor-pointer text-left"
+                  >
+                    <ChevronRight className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>Product Backlog (Excel / CSV)</span>
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
 

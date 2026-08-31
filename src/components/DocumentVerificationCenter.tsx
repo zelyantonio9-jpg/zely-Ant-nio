@@ -16,9 +16,11 @@ import {
   Building,
   User,
   Truck,
-  Sprout
+  Sprout,
+  Loader2
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
+import { uploadRealFileToStorage } from '../services/storageService';
 import { 
   UserDocument, 
   DocumentVerificationStatus, 
@@ -137,32 +139,53 @@ export const DocumentVerificationCenter: React.FC<DocumentVerificationCenterProp
   const requiredDocs = getRequiredDocsForProfile();
   const currentDocs = currentUser.documents || [];
 
-  const handleSimulatedUpload = (docType: DocumentTypeEnum, label: string) => {
-    setUploadingState(true);
-    setTimeout(() => {
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [docErrorMessage, setDocErrorMessage] = useState<string>('');
+
+  const handleRealUpload = async (docType: DocumentTypeEnum, label: string, file: File) => {
+    if (!file) return;
+    setUploadingDocType(docType);
+    setDocErrorMessage('');
+
+    try {
+      const uploadResult = await uploadRealFileToStorage(file, 'documents');
       uploadUserDocument(currentUser.id, {
         documentType: docType,
         label,
-        fileName: `${label.toLowerCase().replace(/[\s/]/g, '_')}_${Date.now().toString().slice(-4)}.pdf`,
-        fileSizeKb: Math.floor(650 + Math.random() * 950),
-        fileMimeType: 'application/pdf'
+        fileName: uploadResult.name || file.name,
+        fileSizeKb: Math.round((uploadResult.size || file.size) / 1024),
+        fileMimeType: uploadResult.type || file.type,
+        fileUrl: uploadResult.url,
+        storageRef: uploadResult.fullPath
       });
-      setUploadingState(false);
       setSelectedDocToUpload(null);
-    }, 700);
+    } catch (err: any) {
+      console.error('Falha no upload do documento real:', err);
+      setDocErrorMessage(`Erro ao carregar ficheiro para ${label}: ${err.message || 'Falha na ligação ao Firebase'}`);
+    } finally {
+      setUploadingDocType(null);
+    }
   };
 
-  const handleSimulatedReplace = (docId: string) => {
-    setUploadingState(true);
-    setTimeout(() => {
+  const handleRealReplace = async (docId: string, file: File) => {
+    if (!file) return;
+    setUploadingDocType(docId);
+    setDocErrorMessage('');
+
+    try {
+      const uploadResult = await uploadRealFileToStorage(file, 'documents');
       replaceUserDocument(currentUser.id, docId, {
-        fileName: `documento_corrigido_${Date.now().toString().slice(-4)}.pdf`,
-        fileSizeKb: Math.floor(700 + Math.random() * 800),
-        fileMimeType: 'application/pdf'
+        fileName: uploadResult.name || file.name,
+        fileSizeKb: Math.round((uploadResult.size || file.size) / 1024),
+        fileMimeType: uploadResult.type || file.type
       });
-      setUploadingState(false);
       setSelectedDocToReplace(null);
-    }, 700);
+    } catch (err: any) {
+      console.error('Falha na substituição do documento real:', err);
+      setDocErrorMessage(`Erro ao substituir ficheiro: ${err.message || 'Falha na ligação ao Firebase'}`);
+    } finally {
+      setUploadingDocType(null);
+    }
   };
 
   const getDocStatusBadge = (status?: DocumentVerificationStatus) => {
@@ -327,9 +350,18 @@ export const DocumentVerificationCenter: React.FC<DocumentVerificationCenterProp
             </div>
           </div>
 
+          {docErrorMessage && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{docErrorMessage}</span>
+            </div>
+          )}
+
           <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
             {requiredDocs.map(req => {
               const uploaded = currentDocs.find(d => d.documentType === req.type);
+              const isUploadingThis = uploadingDocType === req.type || (uploaded && uploadingDocType === uploaded.id);
+
               return (
                 <div key={req.type} className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition">
                   <div className="flex items-start space-x-3">
@@ -367,27 +399,37 @@ export const DocumentVerificationCenter: React.FC<DocumentVerificationCenterProp
                     {getDocStatusBadge(uploaded?.status)}
 
                     {!uploaded && (
-                      <button
-                        type="button"
-                        disabled={uploadingState}
-                        onClick={() => handleSimulatedUpload(req.type, req.label)}
-                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl text-xs flex items-center space-x-1 cursor-pointer border border-amber-400 shadow-xs"
-                      >
-                        <Upload className="w-3 h-3" />
-                        <span>Enviar</span>
-                      </button>
+                      <label className={`px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl text-xs flex items-center space-x-1.5 cursor-pointer border border-amber-400 shadow-xs ${isUploadingThis ? 'opacity-60 cursor-wait' : ''}`}>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          disabled={uploadingDocType !== null}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleRealUpload(req.type, req.label, file);
+                          }}
+                          className="hidden"
+                        />
+                        {isUploadingThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                        <span>{isUploadingThis ? 'A enviar...' : 'Enviar Ficheiro'}</span>
+                      </label>
                     )}
 
                     {uploaded && uploaded.status === 'REJEITADO' && (
-                      <button
-                        type="button"
-                        disabled={uploadingState}
-                        onClick={() => handleSimulatedReplace(uploaded.id)}
-                        className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs flex items-center space-x-1 cursor-pointer shadow-xs"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        <span>Substituir</span>
-                      </button>
+                      <label className={`px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs flex items-center space-x-1.5 cursor-pointer shadow-xs ${isUploadingThis ? 'opacity-60 cursor-wait' : ''}`}>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          disabled={uploadingDocType !== null}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleRealReplace(uploaded.id, file);
+                          }}
+                          className="hidden"
+                        />
+                        {isUploadingThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                        <span>{isUploadingThis ? 'A substituir...' : 'Substituir'}</span>
+                      </label>
                     )}
 
                     {uploaded && uploaded.status === 'APROVADO' && (

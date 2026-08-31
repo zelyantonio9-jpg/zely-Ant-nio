@@ -47,17 +47,17 @@ export class FormalizationEngine {
     // 1. Verificação de BI
     if (!input.hasBi || !input.biNumber) {
       missing.push('Cópia legível do Bilhete de Identidade (BI) ou Cartão de Munícipe');
-      requiredDocs.push('BI_PASSAPORTE');
+      requiredDocs.push('BI');
     } else {
-      requiredDocs.push('BI_PASSAPORTE');
+      requiredDocs.push('BI');
     }
 
     // 2. Verificação de NIF
     if (!input.hasNif || !input.nifNumber) {
       missing.push('Registo e Atribuição do Número de Identificação Fiscal (NIF) junto da AGT');
       institutions.push('AGT');
-      if (!requiredDocs.includes('NIF_EMPRESA')) {
-        requiredDocs.push('NIF_EMPRESA');
+      if (!requiredDocs.includes('NIF')) {
+        requiredDocs.push('NIF');
       }
     }
 

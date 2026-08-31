@@ -41,6 +41,7 @@ import {
   checkOrderAccess,
   checkTenantCompanyAccess
 } from '../utils/rbacEngine';
+import { calculateStrictVerificationLevel } from '../utils/verificationEngine';
 
 export interface CartItem {
   product: Product;
@@ -633,13 +634,9 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const registerEnhancedUser = (profile: UserProfile): UserProfile => {
-    let trustLevel: VerificationLevel = profile.verificationLevel || 2;
-    if (profile.documents && profile.documents.length > 0) {
-      trustLevel = 3;
-    }
-    if (profile.documents && profile.documents.some(d => d.status === 'APROVADO')) {
-      trustLevel = 4;
-    }
+    // Recalculate level strictly
+    const verification = calculateStrictVerificationLevel(profile);
+    const trustLevel: VerificationLevel = verification.level;
 
     const enhancedUser: UserProfile = {
       ...profile,
@@ -650,17 +647,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       completedTransactions: profile.completedTransactions || 0,
       fulfillmentRate: profile.fulfillmentRate || 100,
       avgResponseTimeMin: profile.avgResponseTimeMin || 15,
-      trustBadge: profile.trustBadge || {
+      trustBadge: {
         currentLevel: trustLevel,
-        levelTitle: trustLevel === 1 ? 'Conta Criada' : trustLevel === 2 ? 'Contacto Confirmado' : trustLevel === 3 ? 'Identidade Verificada' : 'Atividade Verificada',
-        verifiedPoints: [
-          `Telemóvel Nacional (+244) Validado`,
-          `Localização Geográfica (${profile.province}) Registada`,
-          ...(profile.biNumber ? ['Bilhete de Identidade Declarado'] : []),
-          ...(profile.nif ? ['NIF Declarado'] : []),
-          ...(profile.socialProtection?.status === 'INSCRITO' ? ['Regime INSS Informado'] : [])
-        ],
-        nextRequirements: ['Aguardar análise dos documentos pela supervisão institucional'],
+        levelTitle: verification.badgeTitle,
+        verifiedPoints: verification.verifiedPoints,
+        nextRequirements: verification.missingPoints,
         issuedAt: new Date().toISOString().slice(0, 10)
       }
     };
@@ -673,7 +664,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     addNotification(
       'Identidade Digital Ativa',
-      `Registo concluído com sucesso para ${enhancedUser.name}. Bem-vindo ao AO MARKET!`,
+      `Registo concluído com sucesso para ${enhancedUser.name}. Nível de Verificação atribuído: Nível ${trustLevel} (${verification.badgeTitle}).`,
       'SECURITY'
     );
     return enhancedUser;
@@ -720,13 +711,21 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updater = (user: UserProfile): UserProfile => {
       const currentDocs = user.documents || [];
       const updatedDocs = [...currentDocs, newDoc];
-      let newLevel = user.verificationLevel;
-      if (newLevel < 3) newLevel = 3;
+      
+      // Strict level recalculation: Pending/EM_ANALISE docs DO NOT increment level until APPROVED
+      const verification = calculateStrictVerificationLevel({ ...user, documents: updatedDocs });
 
       const updated = {
         ...user,
-        verificationLevel: newLevel,
-        documents: updatedDocs
+        verificationLevel: verification.level,
+        documents: updatedDocs,
+        trustBadge: {
+          currentLevel: verification.level,
+          levelTitle: verification.badgeTitle,
+          verifiedPoints: verification.verifiedPoints,
+          nextRequirements: verification.missingPoints,
+          issuedAt: new Date().toISOString().slice(0, 10)
+        }
       };
       FirestoreSyncService.saveUser(updated);
       return updated;
@@ -738,7 +737,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     addAuditLog(userId, `Documento Submetido: ${newDoc.label}`, `Ficheiro: ${newDoc.fileName}`);
-    addNotification('Documento Submetido', `O documento "${newDoc.label}" foi enviado e está em análise.`, 'SECURITY');
+    addNotification('Documento Submetido', `O documento "${newDoc.label}" foi enviado e está em análise pela supervisão.`, 'SECURITY');
   };
 
   const replaceUserDocument = (userId: string, docId: string, newFile: { fileName: string; fileSizeKb: number; fileMimeType: string }) => {
@@ -904,11 +903,8 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return d;
       });
 
-      const hasApprovedDocs = updatedDocs.some(d => d.status === 'APROVADO');
-      let newLevel = user.verificationLevel;
-      if (hasApprovedDocs && user.verificationLevel < 4) {
-        newLevel = 4;
-      }
+      // Strict dynamic verification calculation based on all current approved documents
+      const verification = calculateStrictVerificationLevel({ ...user, documents: updatedDocs });
 
       const allApproved = updatedDocs.length > 0 && updatedDocs.every(d => d.status === 'APROVADO');
       const nextAccStatus = allApproved && user.accountStatus === 'EM_ANALISE' ? 'ATIVO' : user.accountStatus;
@@ -924,9 +920,16 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const updated = {
         ...user,
-        verificationLevel: newLevel,
+        verificationLevel: verification.level,
         accountStatus: nextAccStatus,
         documents: updatedDocs,
+        trustBadge: {
+          currentLevel: verification.level,
+          levelTitle: verification.badgeTitle,
+          verifiedPoints: verification.verifiedPoints,
+          nextRequirements: verification.missingPoints,
+          issuedAt: new Date().toISOString().slice(0, 10)
+        },
         auditLogs: [newAudit, ...(user.auditLogs || [])]
       };
       FirestoreSyncService.saveUser(updated);
@@ -1656,32 +1659,39 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       province: diagnosis.province,
       municipality: diagnosis.municipality,
       commune: diagnosis.commune,
+      currentVerificationLevel: 1,
       status: result.initialStatus,
       progressPercentage: result.initialProgressPercentage,
-      currentStageCode: result.initialStatus,
+      hasBi: diagnosis.hasBi,
       biNumber: diagnosis.biNumber,
+      hasNif: diagnosis.hasNif,
       nifNumber: diagnosis.nifNumber,
+      hasInss: diagnosis.hasInss,
       inssNumber: diagnosis.inssNumber,
-      documentsCount: existingDossier ? existingDossier.documentsCount : (diagnosis.hasBi ? 1 : 0),
+      worksAlone: diagnosis.worksAlone,
+      helpersCount: diagnosis.helpersCount || 0,
+      currentInstitution: 'AO_MARKET',
+      requiredDocuments: result.requiredDocuments as any,
+      submittedDocumentsCount: existingDossier ? existingDossier.submittedDocumentsCount : (diagnosis.hasBi ? 1 : 0),
       approvedDocumentsCount: existingDossier ? existingDossier.approvedDocumentsCount : 0,
+      pendingCorrectionCount: 0,
       createdAt: existingDossier ? existingDossier.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       assignedAgentId: existingDossier?.assignedAgentId,
       assignedAgentName: existingDossier?.assignedAgentName,
-      targetRegime: result.recommendedPath,
       estimatedCompletionDate: new Date(Date.now() + result.estimatedDaysToCompletion * 86400000).toISOString()
     };
 
     // Generate initial stages
-    const generatedStages = FormalizationEngine.generateInitialStages(dossierId, result).map((s, idx) => ({
+    const generatedStages: FormalizationStage[] = FormalizationEngine.generateInitialStages(dossierId, result).map((s, idx) => ({
       id: `stg_${dossierId}_${idx + 1}`,
       dossierId: dossierId,
       stageCode: s.stageCode,
       stageName: s.stageName,
-      orderIndex: idx + 1,
       institutionResponsible: s.institution,
       status: s.status,
       requiredDocuments: s.requiredDocs,
+      submittedDocuments: [],
       startedAt: idx === 0 ? new Date().toISOString() : undefined,
       completedAt: idx === 0 ? new Date().toISOString() : undefined
     }));
@@ -1696,10 +1706,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const audit: FormalizationAuditLog = {
       id: `faudit_${Date.now()}`,
       dossierId: dossierId,
+      userId: currentUser.id,
       actorId: currentUser.id,
       actorName: currentUser.name,
       actorRole: currentUser.role,
-      action: existingDossier ? 'DOSSIER_UPDATED' : 'DOSSIER_CREATED',
+      action: existingDossier ? 'DIAGNOSTICO_SUBMETIDO' : 'DOSSIER_CRIADO',
       timestamp: new Date().toISOString(),
       reason: `Diagnóstico realizado com sucesso. Roteiro recomendado: ${result.recommendedPath} (${result.initialProgressPercentage}% concluído)`
     };
@@ -1749,16 +1760,15 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       fileSizeKb: fileData.fileSizeKb,
       fileMimeType: fileData.fileMimeType,
       fileUrl: fileData.fileUrl,
-      status: 'SUBMETIDO',
-      submittedAt: new Date().toISOString(),
-      verified: false
+      status: 'ENVIADO',
+      submittedAt: new Date().toISOString()
     };
 
     await FirestoreSyncService.saveFormalizationDocument(newDoc);
 
     const updatedDossier: FormalizationDossier = {
       ...dossier,
-      documentsCount: (dossier.documentsCount || 0) + 1,
+      submittedDocumentsCount: (dossier.submittedDocumentsCount || 0) + 1,
       status: 'DOCUMENTOS_SUBMETIDOS',
       updatedAt: new Date().toISOString()
     };
@@ -1767,10 +1777,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const audit: FormalizationAuditLog = {
       id: `faudit_${Date.now()}`,
       dossierId: dossier.id,
+      userId: dossier.userId,
       actorId: currentUser.id,
       actorName: currentUser.name,
       actorRole: currentUser.role,
-      action: 'DOCUMENT_UPLOADED',
+      action: 'DOCUMENTO_ENVIADO',
       timestamp: new Date().toISOString(),
       reason: `Documento "${title}" (${fileData.fileName}) anexado pelo titular.`
     };
@@ -1789,21 +1800,19 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedDoc: FormalizationDocument = {
       ...docItem,
       status: 'APROVADO',
-      reviewedByUserId: currentUser.id,
+      reviewedBy: currentUser.id,
       reviewedByName: currentUser.name,
-      reviewedAt: new Date().toISOString(),
-      notes: notes || 'Documento aprovado pelo agente.',
-      verified: true
+      reviewedAt: new Date().toISOString()
     };
     await FirestoreSyncService.saveFormalizationDocument(updatedDoc);
 
     const dossier = formalizationDossiers.find(d => d.id === docItem.dossierId);
     if (dossier) {
-      const newApprovedCount = (dossier.approvedDocumentsCount || 0) + 1;
+      const newApprovedCount深入 = (dossier.approvedDocumentsCount || 0) + 1;
       const newProgress = Math.min(dossier.progressPercentage + 15, 100);
       const updatedDossier: FormalizationDossier = {
         ...dossier,
-        approvedDocumentsCount: newApprovedCount,
+        approvedDocumentsCount: newApprovedCount深入,
         progressPercentage: newProgress,
         status: newProgress >= 90 ? 'FORMALIZACAO_CONCLUIDA' : 'EM_ANALISE',
         updatedAt: new Date().toISOString()
@@ -1815,10 +1824,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const audit: FormalizationAuditLog = {
       id: `faudit_${Date.now()}`,
       dossierId: docItem.dossierId,
+      userId: docItem.userId,
       actorId: currentUser.id,
       actorName: currentUser.name,
       actorRole: currentUser.role,
-      action: 'DOCUMENT_APPROVED',
+      action: 'DOCUMENTO_APROVADO',
       timestamp: new Date().toISOString(),
       reason: `Documento "${docItem.title}" aprovado por ${currentUser.name}. ${notes || ''}`
     };
@@ -1836,20 +1846,20 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ...docItem,
       status: 'REJEITADO',
       rejectionReason: reason,
-      reviewedByUserId: currentUser.id,
+      reviewedBy: currentUser.id,
       reviewedByName: currentUser.name,
-      reviewedAt: new Date().toISOString(),
-      verified: false
+      reviewedAt: new Date().toISOString()
     };
     await FirestoreSyncService.saveFormalizationDocument(updatedDoc);
 
     const audit: FormalizationAuditLog = {
       id: `faudit_${Date.now()}`,
       dossierId: docItem.dossierId,
+      userId: docItem.userId,
       actorId: currentUser.id,
       actorName: currentUser.name,
       actorRole: currentUser.role,
-      action: 'DOCUMENT_REJECTED',
+      action: 'DOCUMENTO_REJEITADO',
       timestamp: new Date().toISOString(),
       reason: `Documento "${docItem.title}" rejeitado. Motivo: ${reason}`
     };
@@ -1873,7 +1883,6 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedDossier: FormalizationDossier = {
       ...dossier,
       status: newStage,
-      currentStageCode: newStage,
       progressPercentage: newProgress,
       updatedAt: new Date().toISOString()
     };
@@ -1882,10 +1891,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const audit: FormalizationAuditLog = {
       id: `faudit_${Date.now()}`,
       dossierId: dossier.id,
+      userId: dossier.userId,
       actorId: currentUser.id,
       actorName: currentUser.name,
       actorRole: currentUser.role,
-      action: 'STAGE_ADVANCED',
+      action: 'ETAPA_AVANCADA',
       timestamp: new Date().toISOString(),
       reason: `Etapa avançada para ${newStage}. ${notes}`
     };
@@ -1907,8 +1917,7 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       targetInstitution: target,
       referralCode: refCode,
       generatedAt: new Date().toISOString(),
-      status: 'EMITIDO',
-      instructionsPdfUrl: undefined,
+      status: 'GERADO',
       notes: `Guia de encaminhamento prioritário emitida pelo AO MARKET para atendimento presencial na ${target}.`
     };
 
@@ -1917,10 +1926,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const audit: FormalizationAuditLog = {
       id: `faudit_${Date.now()}`,
       dossierId: dossierId,
+      userId: currentUser.id,
       actorId: currentUser.id,
       actorName: currentUser.name,
       actorRole: currentUser.role,
-      action: 'REFERRAL_GENERATED',
+      action: 'ENCAMINHAMENTO_INSTITUCIONAL',
       timestamp: new Date().toISOString(),
       reason: `Guia de encaminhamento ${refCode} gerada para ${target}.`
     };
@@ -1941,15 +1951,15 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       dossierId: dossier.id,
       userId: dossier.userId,
       niss: niss,
-      nif: dossier.nifNumber,
+      nif: dossier.nifNumber || '',
       officialEntityName: dossier.userName,
-      complianceStatus: 'REGULAR',
-      status: 'VERIFICADO_COM_SUCESSO',
-      verificationType: 'VERIFICACAO_MANUAL_AGENTE',
-      verifiedByUserId: currentUser.id,
-      verifiedByName: currentUser.name,
+      regimeType: 'TRABALHADOR_CONTA_PROPRIA',
+      verificationMethod: 'MANUAL_COMPROVATIVO',
+      status: 'VALIDADO_OFICIAL',
+      verifiedByAgentId: currentUser.id,
+      verifiedByAgentName: currentUser.name,
       verifiedAt: new Date().toISOString(),
-      officialDocumentReference: officialRef,
+      officialReferenceCode: officialRef,
       createdAt: new Date().toISOString()
     };
 
@@ -1967,10 +1977,11 @@ export const MarketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const audit: FormalizationAuditLog = {
       id: `faudit_${Date.now()}`,
       dossierId: dossier.id,
+      userId: dossier.userId,
       actorId: currentUser.id,
       actorName: currentUser.name,
       actorRole: currentUser.role,
-      action: 'INSS_RECORD_VALIDATED',
+      action: 'INSS_VERIFICADO',
       timestamp: new Date().toISOString(),
       reason: `Número NISS ${niss} verificado e vinculado com sucesso por ${currentUser.name}. Ref: ${officialRef}`
     };

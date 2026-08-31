@@ -8,6 +8,7 @@ import {
   MapPin,
   FileDown, 
   FileText,
+  FileSpreadsheet,
   ShieldCheck,
   Building2,
   Truck,
@@ -40,6 +41,7 @@ interface HeaderProps {
   onOpenTeamManagement?: () => void;
   onOpenSecurityAuditor?: () => void;
   onOpenAdminSecretModal?: () => void;
+  onOpenBacklog?: () => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   activeTab: string;
@@ -56,6 +58,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTeamManagement,
   onOpenSecurityAuditor,
   onOpenAdminSecretModal,
+  onOpenBacklog,
   searchQuery,
   setSearchQuery,
   activeTab,
@@ -269,6 +272,16 @@ export const Header: React.FC<HeaderProps> = ({
                       >
                         <Scale className="w-4 h-4 text-emerald-600" />
                         <span>Regras & Governação (14 Regras)</span>
+                      </button>
+                    )}
+
+                    {onOpenBacklog && (
+                      <button
+                        onClick={() => { setShowUserMenu(false); onOpenBacklog(); }}
+                        className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-emerald-800 font-semibold flex items-center space-x-2 cursor-pointer"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                        <span>Product Backlog (Excel / CSV)</span>
                       </button>
                     )}
 
@@ -569,6 +582,16 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <FileText className="w-4 h-4 text-blue-600" />
                   <span>Documentos</span>
+                </button>
+              )}
+
+              {onOpenBacklog && (
+                <button
+                  onClick={() => { setMobileMenuOpen(false); onOpenBacklog(); }}
+                  className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl flex items-center space-x-2"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  <span>Backlog Excel</span>
                 </button>
               )}
 

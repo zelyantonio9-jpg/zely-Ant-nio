@@ -159,6 +159,8 @@ export interface UserDocument {
   fileName: string;
   fileSizeKb: number;
   fileMimeType: string;
+  fileUrl: string;
+  storageRef?: string;
   uploadDate: string;
   status: DocumentVerificationStatus;
   rejectionReason?: string;

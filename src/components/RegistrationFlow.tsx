@@ -22,6 +22,7 @@ import {
 import { useMarket } from '../context/MarketContext';
 import { ANGOLA_PROVINCES } from '../data/angolaGeoData';
 import { Logo } from './Logo';
+import { uploadRealFileToStorage } from '../services/storageService';
 import { 
   UserProfile, 
   ActorProfileType, 
@@ -42,7 +43,7 @@ interface RegistrationFlowProps {
   onOpenLegal?: (tab: 'terms' | 'privacy' | 'governance') => void;
 }
 
-type MainCategoryChoice = 'PRODUCER' | 'BUYER' | 'TRANSPORTER' | 'EMPRESA';
+type MainCategoryChoice = 'PRODUCER' | 'MERCHANT' | 'BUYER' | 'TRANSPORTER' | 'EMPRESA';
 
 export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
   onSuccess,
@@ -62,6 +63,22 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
   const [buyerEntityType, setBuyerEntityType] = useState<'PESSOA_SINGULAR' | 'EMPRESA'>('PESSOA_SINGULAR');
   const [transporterKind, setTransporterKind] = useState<'MOTORISTA_INDEPENDENTE' | 'EMPRESA_TRANSPORTES'>('MOTORISTA_INDEPENDENTE');
   const [companyServices, setCompanyServices] = useState<CompanyServiceType[]>(['COMPRAR', 'VENDER']);
+
+  // Merchant specific choices
+  const [merchantBusinessType, setMerchantBusinessType] = useState<'GROSSISTA_ARMAZEM' | 'DISTRIBUIDOR' | 'RETALHISTA_LOJA' | 'OPERADOR_PRACA' | 'CANTINA'>('GROSSISTA_ARMAZEM');
+  const [merchantStoreName, setMerchantStoreName] = useState<string>('');
+  const [merchantProducts, setMerchantProducts] = useState<string[]>([
+    'Cereais e Farinhas',
+    'Feijão e Leguminosas',
+    'Óleos Alimentares',
+    'Açúcar e Sal',
+    'Alimentos Processados e Fardos'
+  ]);
+  const [merchantCustomProduct, setMerchantCustomProduct] = useState<string>('');
+  const [merchantSalesModes, setMerchantSalesModes] = useState<('ATACADO' | 'RETALHO')[]>(['ATACADO', 'RETALHO']);
+  const [hasWarehouse, setHasWarehouse] = useState<boolean>(true);
+  const [warehouseCapacityM3, setWarehouseCapacityM3] = useState<string>('500');
+  const [hasColdStorage, setHasColdStorage] = useState<boolean>(false);
 
   // Step 2: Personal / Company Data
   const [fullName, setFullName] = useState<string>('');
@@ -147,22 +164,35 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
     }
   };
 
-  const handleUploadDoc = (docType: UserDocument['documentType'], label: string) => {
-    setSimulatedUploading(true);
-    setTimeout(() => {
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [docUploadError, setDocUploadError] = useState<string>('');
+
+  const handleRealDocUpload = async (docType: UserDocument['documentType'], label: string, file: File) => {
+    if (!file) return;
+    setUploadingDocType(docType);
+    setDocUploadError('');
+
+    try {
+      const uploadResult = await uploadRealFileToStorage(file, 'documents');
       const newDoc: UserDocument = {
         id: `doc_${Date.now()}`,
         documentType: docType,
         label,
-        fileName: `${label.toLowerCase().replace(/[\s/]/g, '_')}_${Date.now().toString().slice(-4)}.pdf`,
-        fileSizeKb: Math.floor(450 + Math.random() * 1200),
-        fileMimeType: 'application/pdf',
+        fileName: uploadResult.name || file.name,
+        fileSizeKb: Math.round((uploadResult.size || file.size) / 1024),
+        fileMimeType: uploadResult.type || file.type,
+        fileUrl: uploadResult.url,
+        storageRef: uploadResult.fullPath,
         uploadDate: new Date().toISOString().slice(0, 10),
         status: 'EM_ANALISE'
       };
       setUploadedDocs(prev => [...prev.filter(d => d.documentType !== docType), newDoc]);
-      setSimulatedUploading(false);
-    }, 600);
+    } catch (err: any) {
+      console.error('Falha no upload do ficheiro real:', err);
+      setDocUploadError(`Erro ao carregar o ficheiro para ${label}: ${err.message || 'Falha de rede'}`);
+    } finally {
+      setUploadingDocType(null);
+    }
   };
 
   const handleRemoveDoc = (docId: string) => {
@@ -249,6 +279,12 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
           return;
         }
       }
+      if (mainProfile === 'MERCHANT') {
+        if (!merchantStoreName.trim() && !companyName.trim() && !fullName.trim()) {
+          setStepError('Por favor informe o Nome do Estabelecimento / Loja ou Armazém.');
+          return;
+        }
+      }
       setStep(5);
       return;
     }
@@ -274,10 +310,12 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
     
     // Determine mapped role
     let mappedRole: UserRole = 'producer';
-    if (mainProfile === 'BUYER') mappedRole = 'buyer';
+    if (mainProfile === 'MERCHANT') mappedRole = 'merchant';
+    else if (mainProfile === 'BUYER') mappedRole = 'buyer';
     else if (mainProfile === 'TRANSPORTER') mappedRole = 'driver';
     else if (mainProfile === 'EMPRESA') {
-      if (companyServices.includes('VENDER')) mappedRole = 'producer';
+      if (companyServices.includes('COMPRAR') && companyServices.includes('VENDER')) mappedRole = 'merchant';
+      else if (companyServices.includes('VENDER')) mappedRole = 'producer';
       else if (companyServices.includes('COMPRAR')) mappedRole = 'merchant';
       else mappedRole = 'logistics_company';
     }
@@ -285,12 +323,13 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
     // Active profiles
     const activeProfiles: ActorProfileType[] = [];
     if (mainProfile === 'PRODUCER') activeProfiles.push('PRODUCER');
+    if (mainProfile === 'MERCHANT') activeProfiles.push('MERCHANT', 'BUYER', 'PRODUCER');
     if (mainProfile === 'BUYER') activeProfiles.push('BUYER');
     if (mainProfile === 'TRANSPORTER') activeProfiles.push('TRANSPORTER');
     if (mainProfile === 'EMPRESA') {
       activeProfiles.push('EMPRESA');
       if (companyServices.includes('COMPRAR')) activeProfiles.push('BUYER', 'MERCHANT');
-      if (companyServices.includes('VENDER')) activeProfiles.push('PRODUCER');
+      if (companyServices.includes('VENDER')) activeProfiles.push('PRODUCER', 'MERCHANT');
       if (companyServices.includes('TRANSPORTAR')) activeProfiles.push('TRANSPORTER');
     }
 
@@ -322,7 +361,7 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
     const newProfile: UserProfile = {
       id: `usr_${Date.now()}`,
       name: calculatedName,
-      companyName: isCompany ? companyName : (mainProfile === 'PRODUCER' ? (producerFarmName || `Exploração Agrícola ${fullName}`) : undefined),
+      companyName: isCompany ? companyName : (mainProfile === 'PRODUCER' ? (producerFarmName || `Exploração Agrícola ${fullName}`) : (mainProfile === 'MERCHANT' ? (merchantStoreName || `Armazém / Comércio ${fullName}`) : undefined)),
       email,
       phone,
       role: mappedRole,
@@ -368,7 +407,7 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
       completedTransactions: 0,
       fulfillmentRate: 100,
       avgResponseTimeMin: 15,
-      badge: mainProfile === 'PRODUCER' ? 'Produtor Registado' : mainProfile === 'TRANSPORTER' ? 'Transportador Registado' : mainProfile === 'EMPRESA' ? 'Empresa Registada' : 'Comprador Registado',
+      badge: mainProfile === 'PRODUCER' ? 'Produtor Registado' : mainProfile === 'MERCHANT' ? 'Comerciante & Grossista' : mainProfile === 'TRANSPORTER' ? 'Transportador Registado' : mainProfile === 'EMPRESA' ? 'Empresa Registada' : 'Comprador Registado',
       joinedAt: new Date().toISOString().slice(0, 10),
 
       // Producer Details
@@ -387,13 +426,17 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
       } : undefined,
 
       // Merchant Details
-      merchantData: (mainProfile === 'BUYER' && buyerEntityType === 'EMPRESA') || (mainProfile === 'EMPRESA' && companyServices.includes('COMPRAR')) ? {
-        merchantTypes: ['GROSSISTA', 'DISTRIBUIDOR'],
+      merchantData: (mainProfile === 'MERCHANT' || (mainProfile === 'BUYER' && buyerEntityType === 'EMPRESA') || (mainProfile === 'EMPRESA' && companyServices.includes('COMPRAR'))) ? {
+        merchantTypes: [
+          merchantBusinessType === 'GROSSISTA_ARMAZEM' ? 'GROSSISTA' :
+          merchantBusinessType === 'DISTRIBUIDOR' ? 'DISTRIBUIDOR' :
+          merchantBusinessType === 'RETALHISTA_LOJA' ? 'SUPERMERCADO' : 'DISTRIBUIDOR'
+        ],
         hasPhysicalStore: true,
         storeAddress: defaultAddress,
-        hasWarehouse: true,
-        warehouseCapacityM3: 500,
-        hasColdChainStorage: false,
+        hasWarehouse,
+        warehouseCapacityM3: parseFloat(warehouseCapacityM3) || 500,
+        hasColdChainStorage: hasColdStorage,
         commercialRegistryNumber: nif,
         b2bCreditTermsAccepted: true
       } : undefined,
@@ -423,9 +466,9 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
       } : undefined,
 
       // Buyer Details
-      buyerData: (mainProfile === 'BUYER' || (mainProfile === 'EMPRESA' && companyServices.includes('COMPRAR'))) ? {
-        buyerType: isCompany ? 'EMPRESA_TRANSFORMADORA' : 'CONSUMIDOR_FINAL',
-        preferredCategories: buyerPurchases,
+      buyerData: (mainProfile === 'BUYER' || mainProfile === 'MERCHANT' || (mainProfile === 'EMPRESA' && companyServices.includes('COMPRAR'))) ? {
+        buyerType: isCompany ? 'EMPRESA_TRANSFORMADORA' : (mainProfile === 'MERCHANT' ? 'REVENDA' : 'CONSUMIDOR_FINAL'),
+        preferredCategories: mainProfile === 'MERCHANT' ? merchantProducts : buyerPurchases,
         preferredDeliveryProvince: provinceId,
         defaultDeliveryAddress: defaultAddress
       } : undefined,
@@ -525,14 +568,14 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               
               {/* Option 1: Produtor */}
               <div 
                 onClick={() => setMainProfile('PRODUCER')}
                 className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between ${
                   mainProfile === 'PRODUCER'
-                    ? 'border-amber-500 bg-amber-50/40 shadow-xs'
+                    ? 'border-emerald-600 bg-emerald-50/50 shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
@@ -541,41 +584,41 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
                     <Sprout className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-extrabold text-sm text-slate-900">Quero vender / Sou Produtor</div>
+                    <div className="font-extrabold text-sm text-slate-900">Produtor / Agricultor</div>
                     <p className="text-slate-500 text-[11px] mt-0.5">
-                      Para agricultores familiares, pecuaristas, pescadores e cooperativas agrícolas.
+                      Agricultores familiares, pecuaristas, pescadores e cooperativas agrícolas.
                     </p>
                   </div>
                 </div>
                 <div className="mt-3 text-[10px] text-emerald-800 font-bold flex items-center">
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                  Publicar lotes de colheita & vendas diretas
+                  Vender colheitas e lotes agropecuários
                 </div>
               </div>
 
-              {/* Option 2: Comprador */}
+              {/* Option 2: Comerciante / Grossista */}
               <div 
-                onClick={() => setMainProfile('BUYER')}
+                onClick={() => setMainProfile('MERCHANT')}
                 className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between ${
-                  mainProfile === 'BUYER'
-                    ? 'border-amber-500 bg-amber-50/40 shadow-xs'
+                  mainProfile === 'MERCHANT'
+                    ? 'border-amber-500 bg-amber-50/50 shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
                 <div className="space-y-2">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center">
                     <Store className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-extrabold text-sm text-slate-900">Quero comprar / Sou Comprador</div>
+                    <div className="font-extrabold text-sm text-slate-900">Comerciante / Grossista</div>
                     <p className="text-slate-500 text-[11px] mt-0.5">
-                      Para consumidores individuais, comerciantes, restaurantes ou empresas revendedoras.
+                      Armazéns, distribuidores, minimercados, cantinas e operadores de praça.
                     </p>
                   </div>
                 </div>
-                <div className="mt-3 text-[10px] text-blue-800 font-bold flex items-center">
+                <div className="mt-3 text-[10px] text-amber-900 font-bold flex items-center">
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                  Compras seguras com AO Protect & RFQ B2B
+                  Vender estoque & comprar no atacado B2B
                 </div>
               </div>
 
@@ -584,33 +627,59 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
                 onClick={() => setMainProfile('TRANSPORTER')}
                 className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between ${
                   mainProfile === 'TRANSPORTER'
-                    ? 'border-amber-500 bg-amber-50/40 shadow-xs'
+                    ? 'border-sky-600 bg-sky-50/50 shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
                 <div className="space-y-2">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center">
                     <Truck className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-extrabold text-sm text-slate-900">Prestar fretes / Sou Transportador</div>
+                    <div className="font-extrabold text-sm text-slate-900">Transportador / Fretes</div>
                     <p className="text-slate-500 text-[11px] mt-0.5">
-                      Para motoristas individuais e operadores de frotas rodoviárias interprovinciais.
+                      Motoristas individuais, Canteristas e frotistas interprovinciais.
                     </p>
                   </div>
                 </div>
-                <div className="mt-3 text-[10px] text-amber-900 font-bold flex items-center">
+                <div className="mt-3 text-[10px] text-sky-800 font-bold flex items-center">
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                  Bolsa de Cargas & Validação OTP
+                  Bolsa de Cargas & validação OTP segura
                 </div>
               </div>
 
-              {/* Option 4: Empresa Multi-Função */}
+              {/* Option 4: Comprador */}
+              <div 
+                onClick={() => setMainProfile('BUYER')}
+                className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between ${
+                  mainProfile === 'BUYER'
+                    ? 'border-blue-600 bg-blue-50/50 shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                }`}
+              >
+                <div className="space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-extrabold text-sm text-slate-900">Comprador / Consumidor</div>
+                    <p className="text-slate-500 text-[11px] mt-0.5">
+                      Consumidores finais, restaurantes, hotéis e refeitórios coletivos.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 text-[10px] text-blue-800 font-bold flex items-center">
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                  Compras seguras com AO Protect & RFQ
+                </div>
+              </div>
+
+              {/* Option 5: Empresa Multi-Função */}
               <div 
                 onClick={() => setMainProfile('EMPRESA')}
-                className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between ${
+                className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between sm:col-span-2 lg:col-span-2 ${
                   mainProfile === 'EMPRESA'
-                    ? 'border-amber-500 bg-amber-50/40 shadow-xs'
+                    ? 'border-purple-600 bg-purple-50/50 shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
@@ -619,19 +688,51 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
                     <Building2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-extrabold text-sm text-slate-900">Sou uma Empresa (Multi-função)</div>
+                    <div className="font-extrabold text-sm text-slate-900">Empresa / Agroindústria Integrada (Multi-função)</div>
                     <p className="text-slate-500 text-[11px] mt-0.5">
-                      Para empresas que compram, vendem e/ou transportam numa conta única corporativa.
+                      Para sociedades comerciais que compram matérias-primas, vendem produção processada e transportam com frota própria.
                     </p>
                   </div>
                 </div>
                 <div className="mt-3 text-[10px] text-purple-800 font-bold flex items-center">
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                  Gestão multiperfil & RBAC de equipa
+                  Acesso unificado a todos os portais & equipa corporativa
                 </div>
               </div>
 
             </div>
+
+            {/* Sub-selector for Merchant: Business Type */}
+            {mainProfile === 'MERCHANT' && (
+              <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
+                <div className="font-bold text-amber-950 text-xs">Tipo de Estabelecimento Comercial:</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { id: 'GROSSISTA_ARMAZEM' as const, label: 'Armazém Grossista', desc: 'Venda em grande escala por fardos/sacos' },
+                    { id: 'DISTRIBUIDOR' as const, label: 'Distribuidor Regional', desc: 'Distribuição para redes e retalho' },
+                    { id: 'RETALHISTA_LOJA' as const, label: 'Loja / Minimercado', desc: 'Atendimento comercial direto' },
+                    { id: 'OPERADOR_PRACA' as const, label: 'Comerciante de Praça / Feira', desc: 'Operador em mercados municipais' },
+                    { id: 'CANTINA' as const, label: 'Cantina / Depósito', desc: 'Comércio de proximidade' }
+                  ].map(bt => (
+                    <button
+                      key={bt.id}
+                      type="button"
+                      onClick={() => setMerchantBusinessType(bt.id)}
+                      className={`p-2.5 rounded-xl font-bold text-xs cursor-pointer transition border text-left flex flex-col justify-between ${
+                        merchantBusinessType === bt.id
+                          ? 'bg-amber-500 text-black border-amber-400 font-extrabold shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="leading-tight">{bt.label}</div>
+                      <div className={`text-[10px] mt-1 font-normal leading-tight ${merchantBusinessType === bt.id ? 'text-black/80' : 'text-slate-400'}`}>
+                        {bt.desc}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Sub-selector for Buyer: Singular vs Empresa */}
             {mainProfile === 'BUYER' && (
@@ -1169,81 +1270,250 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
               </div>
             )}
 
-            {/* FORMALIZATION & INSS SECTION (For Producers & General) */}
+            {/* MERCHANT SPECIFIC FIELDS */}
+            {(mainProfile === 'MERCHANT' || (mainProfile === 'EMPRESA' && companyServices.includes('COMPRAR') && companyServices.includes('VENDER'))) && (
+              <div className="space-y-3 p-3.5 bg-amber-50/70 border border-amber-300 rounded-2xl">
+                <div className="font-extrabold text-amber-950 text-xs flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Store className="w-4 h-4 mr-1.5 text-amber-800" />
+                    <span>Dados do Comércio & Armazém Grossista</span>
+                  </div>
+                  <span className="bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md text-[10px] font-bold">
+                    Venda & Compra B2B
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Nome da Loja / Armazém / Estabelecimento *</label>
+                    <input
+                      type="text"
+                      value={merchantStoreName}
+                      onChange={e => setMerchantStoreName(e.target.value)}
+                      placeholder="Ex: Armazéns Huambo Comercial Lda"
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Modalidades de Comercialização</label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleArrayItem(merchantSalesModes, 'ATACADO', setMerchantSalesModes as any)}
+                        className={`p-2 rounded-xl text-center font-bold text-xs cursor-pointer border transition flex items-center justify-center space-x-1 ${
+                          merchantSalesModes.includes('ATACADO')
+                            ? 'bg-amber-500 text-black border-amber-500 font-extrabold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {merchantSalesModes.includes('ATACADO') && <Check className="w-3.5 h-3.5" />}
+                        <span>Atacado / B2B (Fardos/Sacos)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleArrayItem(merchantSalesModes, 'RETALHO', setMerchantSalesModes as any)}
+                        className={`p-2 rounded-xl text-center font-bold text-xs cursor-pointer border transition flex items-center justify-center space-x-1 ${
+                          merchantSalesModes.includes('RETALHO')
+                            ? 'bg-amber-500 text-black border-amber-500 font-extrabold shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {merchantSalesModes.includes('RETALHO') && <Check className="w-3.5 h-3.5" />}
+                        <span>Retalho / Unidades</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Linhas de Produtos Comercializados:</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {merchantProducts.map(prod => (
+                      <span key={prod} className="px-2.5 py-1 bg-amber-100 text-amber-950 border border-amber-300 rounded-xl font-bold text-[11px] flex items-center">
+                        {prod}
+                        <button
+                          type="button"
+                          onClick={() => setMerchantProducts(merchantProducts.filter(p => p !== prod))}
+                          className="ml-1.5 text-amber-800 hover:text-red-700 cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      value={merchantCustomProduct}
+                      onChange={e => setMerchantCustomProduct(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (merchantCustomProduct.trim() && !merchantProducts.includes(merchantCustomProduct.trim())) {
+                            setMerchantProducts([...merchantProducts, merchantCustomProduct.trim()]);
+                            setMerchantCustomProduct('');
+                          }
+                        }
+                      }}
+                      placeholder="Adicionar categoria (ex: Bebidas, Enlatados, Sabão em Barra)"
+                      className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-xl outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (merchantCustomProduct.trim() && !merchantProducts.includes(merchantCustomProduct.trim())) {
+                          setMerchantProducts([...merchantProducts, merchantCustomProduct.trim()]);
+                          setMerchantCustomProduct('');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-extrabold cursor-pointer"
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-amber-200">
+                  <div className="flex items-center space-x-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="hasWarehouseCb"
+                      checked={hasWarehouse}
+                      onChange={e => setHasWarehouse(e.target.checked)}
+                      className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                    />
+                    <label htmlFor="hasWarehouseCb" className="text-slate-800 font-bold text-xs cursor-pointer">
+                      Possui Armazém de Estocagem
+                    </label>
+                  </div>
+
+                  {hasWarehouse && (
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-0.5 text-[11px]">Capacidade Estocagem (m³)</label>
+                      <input
+                        type="number"
+                        value={warehouseCapacityM3}
+                        onChange={e => setWarehouseCapacityM3(e.target.value)}
+                        placeholder="Ex: 500"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl outline-none font-mono font-bold"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center space-x-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="hasColdStorageCb"
+                      checked={hasColdStorage}
+                      onChange={e => setHasColdStorage(e.target.checked)}
+                      className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                    />
+                    <label htmlFor="hasColdStorageCb" className="text-slate-800 font-bold text-xs cursor-pointer">
+                      Possui Câmara Fria / Congelador
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* FORMALIZATION & INSS SECTION (For All Profiles) */}
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-              <div className="font-extrabold text-slate-900 text-xs">
-                Enquadramento Fiscal & Formalização
+              <div className="font-extrabold text-slate-900 text-xs flex items-center justify-between">
+                <span>Enquadramento Fiscal, PREI & Segurança Social</span>
+                <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-bold">
+                  República de Angola
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Está Formalizado? *</label>
+                  <label className="block text-slate-700 font-bold mb-1">Enquadramento Fiscal / Atividade *</label>
                   <select
                     value={formalizationStatus}
                     onChange={e => setFormalizationStatus(e.target.value as FormalizationOption)}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold outline-none"
                   >
-                    <option value="SIM">Sim (Possuo NIF / Empresa / Registo)</option>
-                    <option value="EM_PROCESSO">Estou em processo de formalização</option>
-                    <option value="NAO">Não (Produtor / Operador Informal)</option>
+                    <option value="SIM">Formalizado (Com NIF da AGT / Alvará / Certidão)</option>
+                    <option value="EM_PROCESSO">Programa PREI (Transição da Economia Informal)</option>
+                    <option value="NAO">Operador Tradicional / Informal (Sem barreiras de entrada)</option>
                   </select>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    {formalizationStatus === 'NAO' ? 'Pode comercializar e utilizar a plataforma sem bloqueio.' : 'Aumenta o nível de confiança para transações B2B.'}
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {formalizationStatus === 'SIM' 
+                      ? 'Permite emitir faturas certificadas e receber via AO Protect sem retenção.' 
+                      : formalizationStatus === 'EM_PROCESSO'
+                      ? 'Apoio governamental PREI para bancarização e formalização gradual.'
+                      : 'Livre acesso imediato à plataforma e vendas diretas.'}
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Está Inscrito no INSS? *</label>
+                  <label className="block text-slate-700 font-bold mb-1">Inscrição no INSS (Segurança Social) *</label>
                   <select
                     value={inssStatus}
                     onChange={e => setInssStatus(e.target.value as InssOption)}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold outline-none"
                   >
-                    <option value="SIM">Sim (Tenho número de segurado)</option>
+                    <option value="SIM">Inscrito no INSS (Tenho número de segurado)</option>
                     <option value="PROCESSO_EM_CURSO">Processo em curso no INSS</option>
-                    <option value="NAO">Não estou inscrito</option>
+                    <option value="NAO">Não inscrito no INSS</option>
                   </select>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Proteção social para trabalhadores por conta própria e empresas.
+                  </p>
                 </div>
               </div>
 
               {inssStatus === 'SIM' && (
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Número de Inscrição no INSS</label>
+                  <label className="block text-slate-700 font-bold mb-1">Número de Segurado INSS</label>
                   <input
                     type="text"
                     value={inssNumber}
                     onChange={e => setInssNumber(e.target.value)}
-                    placeholder="Ex: 1098234-AO"
-                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl outline-none font-mono"
+                    placeholder="Ex: 1098234-AO ou 0039281-HB"
+                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl outline-none font-mono font-bold"
                   />
                 </div>
               )}
 
-              {formalizationStatus === 'SIM' && (
-                <div className="pt-2 border-t border-slate-200">
-                  <div className="text-[11px] font-bold text-slate-800 mb-1.5">Dados Bancários para Liquidações AO Protect (Opcional):</div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div>
-                      <input
-                        type="text"
-                        value={bankName}
-                        onChange={e => setBankName(e.target.value)}
-                        placeholder="Nome do Banco (ex: BFA, BAI)"
-                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl outline-none"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <input
-                        type="text"
-                        value={iban}
-                        onChange={e => setIban(e.target.value)}
-                        placeholder="IBAN: AO06 0000 0000 0000 0000 0000 0"
-                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl outline-none font-mono"
-                      />
-                    </div>
+              {/* Dados Bancários Nacionais */}
+              <div className="pt-2.5 border-t border-slate-200">
+                <div className="text-[11px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
+                  <span>Conta Bancária Angolana para Recebimentos AO Protect (Opcional):</span>
+                  <span className="text-[10px] text-slate-400 font-mono">IBAN AO06...</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <select
+                      value={bankName}
+                      onChange={e => setBankName(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl outline-none font-bold text-xs"
+                    >
+                      <option value="BFA - Banco de Fomento Angola">BFA - Banco de Fomento Angola</option>
+                      <option value="BAI - Banco Angolano de Investimentos">BAI - Banco Angolano de Investimentos</option>
+                      <option value="BPC - Banco de Poupança e Crédito">BPC - Banco de Poupança e Crédito</option>
+                      <option value="Banco Sol">Banco Sol</option>
+                      <option value="Standard Bank Angola">Standard Bank Angola</option>
+                      <option value="Millennium Atlântico">Millennium Atlântico</option>
+                      <option value="Banco BIC">Banco BIC</option>
+                      <option value="Banco BCA">Banco BCA</option>
+                      <option value="Banco Keve">Banco Keve</option>
+                      <option value="Banco Yetu">Banco Yetu</option>
+                      <option value="Outro Banco">Outro Banco Angolano</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <input
+                      type="text"
+                      value={iban}
+                      onChange={e => setIban(e.target.value)}
+                      placeholder="IBAN: AO06 0000 0000 0000 0000 0000 0"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl outline-none font-mono font-bold"
+                    />
                   </div>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* BUYER SPECIFIC */}
@@ -1407,6 +1677,13 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
             <div className="space-y-2.5">
               <div className="font-bold text-slate-800 text-xs">Documentos recomendados para o seu perfil:</div>
               
+              {docUploadError && (
+                <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{docUploadError}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 
                 {/* BI */}
@@ -1423,14 +1700,19 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Anexado
                     </span>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={simulatedUploading}
-                      onClick={() => handleUploadDoc('BI', 'Bilhete de Identidade')}
-                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400"
-                    >
-                      {simulatedUploading ? 'A carregar...' : '+ Anexar'}
-                    </button>
+                    <label className={`px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400 flex items-center gap-1 ${uploadingDocType === 'BI' ? 'opacity-60 cursor-wait' : ''}`}>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        disabled={uploadingDocType !== null}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleRealDocUpload('BI', 'Bilhete de Identidade', file);
+                        }}
+                        className="hidden"
+                      />
+                      <span>{uploadingDocType === 'BI' ? 'A enviar...' : '+ Anexar'}</span>
+                    </label>
                   )}
                 </div>
 
@@ -1448,14 +1730,19 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Anexado
                     </span>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={simulatedUploading}
-                      onClick={() => handleUploadDoc('NIF', 'Comprovativo de NIF')}
-                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400"
-                    >
-                      {simulatedUploading ? 'A carregar...' : '+ Anexar'}
-                    </button>
+                    <label className={`px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400 flex items-center gap-1 ${uploadingDocType === 'NIF' ? 'opacity-60 cursor-wait' : ''}`}>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        disabled={uploadingDocType !== null}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleRealDocUpload('NIF', 'Comprovativo de NIF', file);
+                        }}
+                        className="hidden"
+                      />
+                      <span>{uploadingDocType === 'NIF' ? 'A enviar...' : '+ Anexar'}</span>
+                    </label>
                   )}
                 </div>
 
@@ -1475,14 +1762,19 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Anexado
                         </span>
                       ) : (
-                        <button
-                          type="button"
-                          disabled={simulatedUploading}
-                          onClick={() => handleUploadDoc('CARTA_CONDUCAO', 'Carta de Condução')}
-                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400"
-                        >
-                          + Anexar
-                        </button>
+                        <label className={`px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400 flex items-center gap-1 ${uploadingDocType === 'CARTA_CONDUCAO' ? 'opacity-60 cursor-wait' : ''}`}>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            disabled={uploadingDocType !== null}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleRealDocUpload('CARTA_CONDUCAO', 'Carta de Condução', file);
+                            }}
+                            className="hidden"
+                          />
+                          <span>{uploadingDocType === 'CARTA_CONDUCAO' ? 'A enviar...' : '+ Anexar'}</span>
+                        </label>
                       )}
                     </div>
 
@@ -1499,14 +1791,19 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Anexado
                         </span>
                       ) : (
-                        <button
-                          type="button"
-                          disabled={simulatedUploading}
-                          onClick={() => handleUploadDoc('LIVRETE_VEICULO', 'Livrete do Veículo')}
-                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400"
-                        >
-                          + Anexar
-                        </button>
+                        <label className={`px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400 flex items-center gap-1 ${uploadingDocType === 'LIVRETE_VEICULO' ? 'opacity-60 cursor-wait' : ''}`}>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            disabled={uploadingDocType !== null}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleRealDocUpload('LIVRETE_VEICULO', 'Livrete do Veículo', file);
+                            }}
+                            className="hidden"
+                          />
+                          <span>{uploadingDocType === 'LIVRETE_VEICULO' ? 'A enviar...' : '+ Anexar'}</span>
+                        </label>
                       )}
                     </div>
                   </>
@@ -1527,14 +1824,19 @@ export const RegistrationFlow: React.FC<RegistrationFlowProps> = ({
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Anexado
                       </span>
                     ) : (
-                      <button
-                        type="button"
-                        disabled={simulatedUploading}
-                        onClick={() => handleUploadDoc('COMPROVATIVO_INSS', 'Comprovativo INSS')}
-                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400"
-                      >
-                        + Anexar
-                      </button>
+                      <label className={`px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-[10px] font-bold cursor-pointer border border-amber-400 flex items-center gap-1 ${uploadingDocType === 'COMPROVATIVO_INSS' ? 'opacity-60 cursor-wait' : ''}`}>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          disabled={uploadingDocType !== null}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleRealDocUpload('COMPROVATIVO_INSS', 'Comprovativo INSS', file);
+                          }}
+                          className="hidden"
+                        />
+                        <span>{uploadingDocType === 'COMPROVATIVO_INSS' ? 'A enviar...' : '+ Anexar'}</span>
+                      </label>
                     )}
                   </div>
                 )}
